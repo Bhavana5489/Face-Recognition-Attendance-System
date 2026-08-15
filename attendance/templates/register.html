@@ -30,6 +30,10 @@
                 <!-- Video Stream Feed -->
                 <div>
                     <div class="video-wrapper">
+                        <div class="video-overlay-scanline"></div>
+                        <svg class="face-guide-svg" viewBox="0 0 100 120" preserveAspectRatio="none">
+                            <ellipse cx="50" cy="60" rx="35" ry="50" />
+                        </svg>
                         <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Video Stream">
                         <div class="recording-badge" id="recBadge" style="display: none;">
                             <span class="recording-dot"></span>
@@ -197,5 +201,30 @@
             }, 3000);
         }
     </script>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    <script>
+        function showToast(message, type='success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icon = type === 'success' ? '✅' : '⚠️';
+            toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
+            
+            container.appendChild(toast);
+            
+            // Trigger reflow to start transition
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+
 </body>
 </html>

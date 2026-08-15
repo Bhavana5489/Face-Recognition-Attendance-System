@@ -30,6 +30,7 @@
                 <!-- Video Stream Feed -->
                 <div>
                     <div class="video-wrapper">
+                        <div class="video-overlay-scanline"></div>
                         <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Attendance Stream">
                     </div>
                 </div>
@@ -163,6 +164,7 @@
                         audioPlayed = true;
                     }
                     statusBadge.innerText = "VERIFIED!";
+                    showToast("Attendance successfully verified!", "success");
                     statusBadge.className = "badge badge-success";
                     progressText.innerText = "2 / 2";
                     progressBar.style.width = "100%";
@@ -174,6 +176,7 @@
                     }, 2500);
                 } else if (data.state === "fail_feedback") {
                     statusBadge.innerText = "FAILED VERIFICATION";
+                    showToast("Verification failed. Please try again.", "error");
                     statusBadge.className = "badge badge-danger";
                     progressText.innerText = "0 / 2";
                     progressBar.style.width = "0%";
@@ -191,5 +194,30 @@
             initAttendance();
         });
     </script>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    <script>
+        function showToast(message, type='success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icon = type === 'success' ? '✅' : '⚠️';
+            toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
+            
+            container.appendChild(toast);
+            
+            // Trigger reflow to start transition
+            setTimeout(() => toast.classList.add('show'), 10);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+
 </body>
 </html>
