@@ -1,0 +1,28 @@
+# Datasets and Images
+dataset/
+attendance/dataset/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+
+# Database
+database.json
+attendance/database.json
+
+# Virtual Environments
+venv/
+env/
+anti_spoofing/venv/
+.env
+
+# Pytest / Python Cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store

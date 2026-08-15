@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Attendance - GazePass</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <a href="/" class="logo">🎯 GAZEPASS</a>
+            <div class="nav-links">
+                <a href="/" class="nav-btn">Dashboard</a>
+                <a href="/register_page" class="nav-btn">Register Student</a>
+                <a href="/mark_page" class="nav-btn active">Mark Attendance</a>
+            </div>
+        </div>
+    </header>
+
+    <main style="max-width: 1000px;">
+        <div class="glass-card">
+            <h2 class="title-glow" style="margin-bottom: 0.5rem;">Mark Attendance</h2>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">
+                Align your face in the camera. Once recognized, follow the red dot with your eyes to check in.
+            </p>
+
+            <div class="grid-2" style="grid-template-columns: 1.4fr 1fr; align-items: start;">
+                <!-- Video Stream Feed -->
+                <div>
+                    <div class="video-wrapper">
+                        <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Attendance Stream">
+                    </div>
+                </div>
+
+                <!-- Verification Panel -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem; padding-top: 0.5rem;">
+                    <div class="glass-card" style="padding: 1.5rem; background: rgba(255, 255, 255, 0.02);">
+                        <h3 style="margin-bottom: 0.8rem; font-size: 1.1rem; color: var(--text-muted);">Real-time Status</h3>
+                        
+                        <div style="margin-bottom: 1.2rem;">
+                            <span class="badge badge-info" id="statusBadge" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                                Initializing...
+                            </span>
+                        </div>
+
+                        <div style="margin-bottom: 1rem;">
+                            <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">RECOGNIZED PROFILE</span>
+                            <strong style="font-size: 1.4rem; color: #fff;" id="profileName">Searching...</strong>
+                        </div>
+
+                        <div>
+                            <span style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">EYE GAZE DIRECTION</span>
+                            <strong style="font-size: 1.4rem; color: var(--primary);" id="gazeDir">N/A</strong>
+                        </div>
+                    </div>
+
+                    <!-- Progress / Checkmarks -->
+                    <div class="glass-card" style="padding: 1.5rem; background: rgba(255, 255, 255, 0.02);" id="gazeProgressCard">
+                        <h3 style="margin-bottom: 0.8rem; font-size: 1.1rem;">Gaze Verification</h3>
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-top: 1rem;">
+                            <div style="display: flex; flex-direction: column; gap: 0.6rem; width: 100%;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted);">
+                                    <span>Target stops followed:</span>
+                                    <span id="progressText">0 / 2</span>
+                                </div>
+                                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 10px; overflow: hidden;">
+                                    <div id="progressBar" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn btn-danger" style="flex: 1;" onclick="stopAttendance()">
+                            🛑 Stop / Exit
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let pollInterval = null;
+        let audioPlayed = false;
+
+        function playSuccessSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+                gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 1);
+                osc.start();
+                osc.stop(ctx.currentTime + 1);
+            } catch(e) { console.error(e); }
+        }
+
+        async function initAttendance() {
+            try {
+                // Tell backend to switch camera mode to mark attendance
+                await fetch('/api/start_attendance', { method: 'POST' });
+                
+                // Start polling state
+                pollInterval = setInterval(pollStatus, 300);
+            } catch (err) {
+                console.error("Error starting attendance marking:", err);
+            }
+        }
+
+        async function stopAttendance() {
+            if (pollInterval) clearInterval(pollInterval);
+            try {
+                await fetch('/api/stop_attendance', { method: 'POST' });
+            } catch(e){}
+            window.location.href = "/";
+        }
+
+        async function pollStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                const statusBadge = document.getElementById('statusBadge');
+                const profileName = document.getElementById('profileName');
+                const gazeDir = document.getElementById('gazeDir');
+                const progressText = document.getElementById('progressText');
+                const progressBar = document.getElementById('progressBar');
+
+                // Update recognized name
+                profileName.innerText = data.recognized.replace('_', ' ');
+                gazeDir.innerText = data.gaze;
+
+                // Update state specific classes & badge
+                if (data.state === "mark") {
+                    if (data.recognized === "Unknown") {
+                        statusBadge.innerText = "Align Face to Start";
+                        statusBadge.className = "badge badge-info";
+                        progressText.innerText = "0 / 2";
+                        progressBar.style.width = "0%";
+                    } else {
+                        statusBadge.innerText = "Follow the Moving Dot!";
+                        statusBadge.className = "badge badge-info";
+                        statusBadge.style.color = "var(--warning)";
+                        statusBadge.style.borderColor = "rgba(255, 179, 0, 0.2)";
+                        
+                        // Update waypoint progress
+                        const wp = data.waypoint;
+                        progressText.innerText = `${wp} / 2`;
+                        progressBar.style.width = `${(wp / 2) * 100}%`;
+                    }
+                } else if (data.state === "success_feedback") {
+                    if (!audioPlayed) {
+                        playSuccessSound();
+                        audioPlayed = true;
+                    }
+                    statusBadge.innerText = "VERIFIED!";
+                    statusBadge.className = "badge badge-success";
+                    progressText.innerText = "2 / 2";
+                    progressBar.style.width = "100%";
+                    progressBar.style.background = "var(--success)";
+                    
+                    // Redirect back to dashboard after verification success
+                    setTimeout(() => {
+                        stopAttendance();
+                    }, 2500);
+                } else if (data.state === "fail_feedback") {
+                    statusBadge.innerText = "FAILED VERIFICATION";
+                    statusBadge.className = "badge badge-danger";
+                    progressText.innerText = "0 / 2";
+                    progressBar.style.width = "0%";
+                } else {
+                    statusBadge.innerText = "Idle";
+                    statusBadge.className = "badge badge-info";
+                }
+            } catch(err) {
+                console.error("Error polling state:", err);
+            }
+        }
+
+        // Initialize automatically without prompt
+        window.addEventListener('DOMContentLoaded', () => {
+            initAttendance();
+        });
+    </script>
+</body>
+</html>

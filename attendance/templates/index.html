@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaze-Tracking Attendance Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <i class="fas fa-eye"></i> GAZEPASS
+            </a>
+            <div class="nav-links">
+                <a href="/" class="nav-btn active">Dashboard</a>
+                <a href="/register_page" class="nav-btn">Register Student</a>
+                <a href="/mark_page" class="nav-btn">Mark Attendance</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Stats Banner -->
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-icon">👤</div>
+                <div>
+                    <div class="stat-num" id="totalStudents">0</div>
+                    <div class="stat-lbl">Registered Students</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✔️</div>
+                <div>
+                    <div class="stat-num" id="todayPresent">0</div>
+                    <div class="stat-lbl">Today Present</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div>
+                    <div class="stat-num" id="attendanceRate">0%</div>
+                    <div class="stat-lbl">Attendance Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-3">
+            <!-- Left Panel: Navigation Actions -->
+            <div class="glass-card">
+                <h2 class="title-glow">Actions</h2>
+                <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">
+                    Perform student registration or launch the live verification system.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <a href="/register_page" class="btn btn-primary">
+                        ➕ Register Student
+                    </a>
+                    <a href="/mark_page" class="btn btn-secondary" style="border-color: var(--primary);">
+                        🎯 Start Attendance Marking
+                    </a>
+                </div>
+            </div>
+
+            <!-- Middle Panel: Student Registry -->
+            <div class="glass-card">
+                <h2>Student Registry</h2>
+                <div class="registry-list" id="studentList">
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Loading students...</p>
+                </div>
+            </div>
+
+            <!-- Right Panel: Today's Logs -->
+            <div class="glass-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 style="margin: 0;">Today's Logs</h2>
+                    <a href="/api/export_logs" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">📥 Export CSV</a>
+                </div>
+                <div class="log-list" id="logList">
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Loading log entries...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function loadDashboardData() {
+            try {
+                // Fetch Students
+                const resStudents = await fetch('/api/students');
+                const students = await resStudents.json();
+                
+                // Fetch Logs
+                const resLogs = await fetch('/api/logs');
+                const logs = await resLogs.json();
+                
+                const today = new Date().toISOString().split('T')[0];
+                let todayLogsObj = logs[today] || {};
+                let todayLogs = [];
+                // Support both flat array and nested subjects
+                if (Array.isArray(todayLogsObj)) {
+                    todayLogs = todayLogsObj.map(name => ({name, subject: 'General'}));
+                } else {
+                    for (const [subject, studentsList] of Object.entries(todayLogsObj)) {
+                        studentsList.forEach(name => todayLogs.push({name, subject}));
+                    }
+                }
+                
+                // Update stats (Count unique students)
+                const uniqueStudents = new Set(todayLogs.map(log => log.name)).size;
+                document.getElementById('totalStudents').innerText = students.length;
+                document.getElementById('todayPresent').innerText = uniqueStudents;
+                
+                const rate = students.length > 0 ? Math.round((uniqueStudents / students.length) * 100) : 0;
+                document.getElementById('attendanceRate').innerText = `${rate}%`;
+                
+                // Update Student list
+                const studentList = document.getElementById('studentList');
+                if (students.length === 0) {
+                    studentList.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">No students registered yet.</p>';
+                } else {
+                    studentList.innerHTML = students.map(name => `
+                        <div class="list-item">
+                            <div>
+                                <div class="student-name">${name.replace('_', ' ')}</div>
+                                <div class="student-meta">Profile Active</div>
+                            </div>
+                            <span class="badge badge-info">Registered</span>
+                        </div>
+                    `).join('');
+                }
+                
+                // Update Logs list
+                const logList = document.getElementById('logList');
+                if (todayLogs.length === 0) {
+                    logList.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">No attendance marked today.</p>';
+                } else {
+                    logList.innerHTML = todayLogs.map((log, idx) => `
+                        <div class="list-item">
+                            <div>
+                                <div class="student-name">${log.name.replace('_', ' ')}</div>
+                                <div class="student-meta">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                            </div>
+                            <span class="badge badge-success">Present</span>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error("Error loading dashboard data:", err);
+            }
+        }
+
+        // Load initially
+        loadDashboardData();
+        // Reload every 10 seconds to keep live dashboard fresh
+        setInterval(loadDashboardData, 10000);
+    </script>
+</body>
+</html>
