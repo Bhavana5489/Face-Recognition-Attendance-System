@@ -34,7 +34,20 @@ class YuNetDetector:
         """Update input size if frame dimensions change."""
         if self.input_size != size:
             self.input_size = size
-            self.detector.setInputSize(size)
+            # In OpenCV 5.0.0, the new graph engine does not support dynamic shape updates via setInputSize,
+            # so we must recreate the detector instance to compile the graph for the new size.
+            try:
+                self.detector = cv2.FaceDetectorYN.create(
+                    model=self.model_path,
+                    config="",
+                    input_size=self.input_size,
+                    score_threshold=self.conf_threshold,
+                    nms_threshold=self.nms_threshold,
+                    top_k=5000
+                )
+            except Exception as e:
+                print(f"[!] Warning: Failed to recreate FaceDetectorYN with size {size}: {e}")
+                self.detector.setInputSize(size)
             
     def detect(self, frame: np.ndarray) -> List[FaceDetection]:
         """
