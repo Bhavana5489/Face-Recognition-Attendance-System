@@ -137,5 +137,43 @@ class TestGazePipeline(unittest.TestCase):
         self.assertEqual(res.challenge_score, 1.0)
         self.assertEqual(res.gaze_score, 1.0)
 
+    def test_directional_rejection(self):
+        """
+        Tests that incorrect directions (e.g. looking RIGHT when command is LEFT) are rejected.
+        """
+        self.test_baseline_acquisition_and_locking()
+        
+        # Simulate reaction window delay of 0.4s
+        time.sleep(0.45)
+        
+        # Feed one observation to transition from WAITING_REACTION to TRACKING_TARGET
+        obs = GazeObservation(time.time(), 0.05, -0.02, 0.9, "DEGRADED", 1.0, -1.0, 0.0)
+        state = self.engine.verify_observation(obs, face_quality=0.85)
+        self.assertEqual(state, ChallengeState.TRACKING_TARGET.value)
+        
+        # Get active command
+        target = self.session["sequence"][0]
+        cmd = target.command
+        baseline_x = self.session["baseline_x"]
+        baseline_y = self.session["baseline_y"]
+        
+        # Feed the OPPOSITE direction of the target command
+        if cmd == "LEFT":
+            gx, gy = baseline_x + 0.35, baseline_y  # RIGHT
+        elif cmd == "RIGHT":
+            gx, gy = baseline_x - 0.35, baseline_y  # LEFT
+        elif cmd == "UP":
+            gx, gy = baseline_x, baseline_y + 0.35  # DOWN
+        else: # DOWN or BLINK
+            gx, gy = baseline_x, baseline_y - 0.35  # UP
+            
+        # Feed incorrect direction multiple times
+        for _ in range(10):
+            obs = GazeObservation(time.time(), gx, gy, 0.95, "DEGRADED", 1.0, -1.0, 0.0)
+            state = self.engine.verify_observation(obs, face_quality=0.85)
+            # Should remain in TRACKING_TARGET (or other non-terminal / non-acquired state)
+            self.assertEqual(state, ChallengeState.TRACKING_TARGET.value)
+            self.assertIsNone(self.session["stability_start_time"])
+
 if __name__ == "__main__":
     unittest.main()

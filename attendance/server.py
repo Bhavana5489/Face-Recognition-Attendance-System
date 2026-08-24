@@ -411,22 +411,54 @@ def process_frame(frame):
             cv2.rectangle(frame, (x, y), (x+w, y+h), box_color, 2)
             cv2.putText(frame, display_text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
 
+            # Draw recognition debug overlay if enabled
+            debug_y_offset = 20
+            if attendance_engine.dev_recognition_debug:
+                # Calculate variance
+                track_session = attendance_engine.sessions.get(tid)
+                variance_str = "N/A"
+                if track_session and track_session.identities:
+                    votes = {}
+                    recent_window = max(5, 15)
+                    recent_identities = track_session.identities[-recent_window:]
+                    for uid, sim, margin in recent_identities:
+                        if uid not in votes:
+                            votes[uid] = []
+                        votes[uid].append(sim)
+                    if votes:
+                        best_id = max(votes, key=lambda k: len(votes[k]))
+                        if len(votes[best_id]) > 1:
+                            variance_str = f"{float(np.var(votes[best_id])):.4f}"
+                        else:
+                            variance_str = "0.0000"
+                
+                top1_sim = latest_metrics.get("top1_similarity", 0.0)
+                margin = latest_metrics.get("margin", 0.0)
+                q_score = latest_metrics.get("quality_score", 0.0)
+                
+                cv2.putText(frame, f"[DBG] TOP1: {display_text}", (x, y + h + debug_y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+                debug_y_offset += 15
+                cv2.putText(frame, f"SIM: {top1_sim:.3f} | MARGIN: {margin:.3f}", (x, y + h + debug_y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+                debug_y_offset += 15
+                cv2.putText(frame, f"VAR: {variance_str} | QUAL: {q_score:.3f}", (x, y + h + debug_y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1)
+                debug_y_offset += 20 # Add space for decision state text below debug overlay
+
             # Check decision states
             if decision.attendance_state in ["MARKED", "ALREADY_MARKED"]:
                 shared_status["message"] = f"MARKED: {decision.student_name}"
-                cv2.putText(frame, "\u2713 ATTENDANCE MARKED", (x, y+h+20),
+                cv2.putText(frame, "\u2713 ATTENDANCE MARKED", (x, y+h+debug_y_offset),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, GREEN_COLOR, 2)
                 continue
             elif decision.attendance_state == "FAILED":
                 reason = decision.failure_reason or "Verification failed"
                 shared_status["message"] = f"Failed ({reason})"
-                cv2.putText(frame, f"FAILED: {reason}", (x, y+h+20),
+                cv2.putText(frame, f"FAILED: {reason}", (x, y+h+debug_y_offset),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
                 continue
             elif decision.attendance_state == "RETRY" and not is_recognized:
                 reason = decision.failure_reason or "Please align face"
                 shared_status["message"] = reason
-                cv2.putText(frame, reason, (x, y+h+20),
+                cv2.putText(frame, reason, (x, y+h+debug_y_offset),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
                 continue
 

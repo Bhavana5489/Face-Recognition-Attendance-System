@@ -111,12 +111,6 @@ class TrackSession:
         median_sim = float(np.median(votes[best_id]["sims"]))
         median_margin = float(np.median(votes[best_id]["margins"]))
         
-        # Stability/variance checks
-        sim_variance = float(np.var(votes[best_id]["sims"]))
-        margin_variance = float(np.var(votes[best_id]["margins"]))
-        if sim_variance > 0.05 or margin_variance > 0.05:
-            return "UNCERTAIN", best_id
-            
         if median_sim < cosine_threshold:
             return "UNKNOWN", best_id
             
@@ -167,6 +161,7 @@ class AttendanceEngine:
         if self.T_pad is None: self.T_pad = 0.60
         self.T_temporal = self.config.get('recognition', {}).get('temporal_threshold')
         if self.T_temporal is None: self.T_temporal = 0.60
+        self.dev_recognition_debug = self.config.get('dev_mode', {}).get('recognition_debug', False)
         
     def process_frame_event(self, track_id: int, identity_results: list, quality_score: float, liveness_score: float, 
                             gaze_obs: GazeObservation, embedding: np.ndarray = None) -> AttendanceDecision:
@@ -174,6 +169,14 @@ class AttendanceEngine:
         if track_id in self.sessions:
             self.sessions[track_id].latest_decision = decision
         return decision
+
+    def _get_challenge_command(self, active_sess) -> str:
+        curr_idx = active_sess["current_index"]
+        cmd = "CENTER"
+        if active_sess["state"] not in [ChallengeState.WAITING, ChallengeState.BASELINE_ACQUISITION]:
+            if curr_idx < len(active_sess["sequence"]):
+                cmd = active_sess["sequence"][curr_idx].command
+        return cmd
 
     def _process_frame_event_inner(self, track_id: int, identity_results: list, quality_score: float, liveness_score: float, 
                              gaze_obs: GazeObservation, embedding: np.ndarray = None) -> AttendanceDecision:
@@ -192,12 +195,18 @@ class AttendanceEngine:
                 liveness_state="PASS",
                 student_name=name
             )
+
+        # 0. UPDATE ACTIVE LIVENESS CHALLENGE UNCONDITIONALLY
+        challenge_state = session.challenge_engine.verify_observation(gaze_obs, quality_score)
+        active_sess = session.challenge_engine.active_session
+        cmd = self._get_challenge_command(active_sess)
             
         # 1. QUALITY CHECK
         quality_pass = quality_score >= self.T_quality
         if not quality_pass:
             return AttendanceDecision(
                 attendance_state="RETRY",
+                challenge_command=cmd,
                 identity_state="UNKNOWN",
                 liveness_state="PENDING",
                 failure_reason="Face quality below threshold"
@@ -228,6 +237,7 @@ class AttendanceEngine:
         if identity_decision == "RETRY":
             return AttendanceDecision(
                 attendance_state="RECOGNITION_PENDING",
+                challenge_command=cmd,
                 identity_state="UNKNOWN",
                 liveness_state="PENDING",
                 student_name=student_name
@@ -235,6 +245,7 @@ class AttendanceEngine:
         elif identity_decision == "UNKNOWN":
             return AttendanceDecision(
                 attendance_state="FAILED",
+                challenge_command=cmd,
                 identity_state="UNKNOWN",
                 liveness_state="PENDING",
                 student_name=student_name,
@@ -243,11 +254,24 @@ class AttendanceEngine:
         elif identity_decision == "UNCERTAIN":
             return AttendanceDecision(
                 attendance_state="RETRY",
+                challenge_command=cmd,
                 identity_state="UNCERTAIN",
                 liveness_state="PENDING",
                 student_name=student_name,
                 failure_reason="Identity margin too low"
             )
+
+        # Bypass PAD + liveness + DB write if in dev debug mode
+        if self.dev_recognition_debug:
+            if identity_decision == "MATCH":
+                session.attendance_marked = True
+                return AttendanceDecision(
+                    attendance_state="MARKED",
+                    challenge_command=cmd,
+                    identity_state="MATCH",
+                    liveness_state="PASS",
+                    student_name=student_name
+                )
             
         # 3. PASSIVE PAD CHECK
         pad_decision = session.get_temporal_pad(
@@ -258,6 +282,7 @@ class AttendanceEngine:
         if pad_decision == "INCONCLUSIVE":
             return AttendanceDecision(
                 attendance_state="LIVENESS_PENDING",
+                challenge_command=cmd,
                 identity_state="IDENTIFIED",
                 liveness_state="PENDING",
                 student_name=student_name
@@ -265,17 +290,14 @@ class AttendanceEngine:
         elif pad_decision == "FAIL":
             return AttendanceDecision(
                 attendance_state="FAILED",
+                challenge_command=cmd,
                 identity_state="IDENTIFIED",
                 liveness_state="SPOOF",
                 student_name=student_name,
                 failure_reason="Passive PAD failed"
             )
             
-        # 4. ACTIVE LIVENESS CHALLENGE
-        challenge_state = session.challenge_engine.verify_observation(gaze_obs, quality_score)
-        active_sess = session.challenge_engine.active_session
-        
-        # Terminal states: COMPLETED, FAILED, TIMEOUT, INCONCLUSIVE
+        # 4. ACTIVE LIVENESS STATUS EVALUATION (Once Quality, Identity, and Passive PAD pass)
         TERMINAL_STATES = {"COMPLETED", "FAILED", "TIMEOUT", "INCONCLUSIVE"}
         is_terminal = challenge_state.upper() in TERMINAL_STATES
         
@@ -288,6 +310,7 @@ class AttendanceEngine:
             elif challenge_res.decision == "INCONCLUSIVE":
                 return AttendanceDecision(
                     attendance_state="INCONCLUSIVE",
+                    challenge_command=cmd,
                     identity_state="MATCH",
                     liveness_state="INCONCLUSIVE",
                     student_name=student_name,
@@ -296,19 +319,14 @@ class AttendanceEngine:
             else:  # FAIL
                 return AttendanceDecision(
                     attendance_state="FAILED",
+                    challenge_command=cmd,
                     identity_state="MATCH",
                     liveness_state="FAIL",
                     student_name=student_name,
                     failure_reason=challenge_res.failure_reason or "Challenge failed"
                 )
         else:
-            # Challenge still in progress — return current command for stimulus rendering
-            curr_idx = active_sess["current_index"]
-            cmd = "CENTER"
-            if active_sess["state"] not in [ChallengeState.WAITING, ChallengeState.BASELINE_ACQUISITION]:
-                if curr_idx < len(active_sess["sequence"]):
-                    cmd = active_sess["sequence"][curr_idx].command
-            
+            # Challenge still in progress
             return AttendanceDecision(
                 attendance_state="LIVENESS_PENDING",
                 challenge_command=cmd,

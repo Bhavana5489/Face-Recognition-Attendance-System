@@ -26,3 +26,7 @@ gaze:
     min_samples: 10
     max_samples: 20
 
+dev_mode:
+  recognition_debug: true
+
+
