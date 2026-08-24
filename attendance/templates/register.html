@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register Student - GazePass</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=8">
 </head>
 <body>
 
@@ -12,9 +12,8 @@
         <div class="nav-container">
             <a href="/" class="logo">🎯 GAZEPASS</a>
             <div class="nav-links">
-                <a href="/" class="nav-btn">Dashboard</a>
-                <a href="/register_page" class="nav-btn active">Register Student</a>
-                <a href="/mark_page" class="nav-btn">Mark Attendance</a>
+                <a href="/admin" class="nav-btn">👑 Admin Portal</a>
+                <a href="/student" class="nav-btn">🎓 Student Portal</a>
             </div>
         </div>
     </header>

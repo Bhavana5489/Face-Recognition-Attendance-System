@@ -1,0 +1,11 @@
+{
+    "student_id": "TEST-001",
+    "session_id": "20260817_001120",
+    "camera_id": 0,
+    "timestamp": "2026-08-17T00:11:20.543348",
+    "lighting_condition": "normal",
+    "distance": "medium",
+    "glasses": false,
+    "dataset_type": "recognition",
+    "category": "enrollment"
+}

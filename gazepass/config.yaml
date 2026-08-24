@@ -1,0 +1,28 @@
+threshold_version: "v0_dev"
+directional_ratio: 1.5
+center_distance_penalty: 0.1
+
+recognition:
+  cosine_threshold: 0.70
+  margin_threshold: 0.05
+  temporal_threshold: 0.60
+
+quality:
+  min_quality: 0.40
+  min_face_size: 80
+
+pad:
+  temporal_threshold: 0.60
+  passive_threshold: 0.50
+
+liveness:
+  challenge_timeout_seconds: 15.0
+  max_attempts: 2
+
+gaze:
+  baseline:
+    max_robust_sigma_x: 0.10
+    max_robust_sigma_y: 0.10
+    min_samples: 10
+    max_samples: 20
+

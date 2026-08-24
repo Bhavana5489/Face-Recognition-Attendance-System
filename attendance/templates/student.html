@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Student Attendance Terminal - GazePass</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=8">
+</head>
+<body class="student-body">
+
+    <!-- Minimal Student Header -->
+    <header class="student-header">
+        <div class="nav-container">
+            <a href="/student" class="logo">
+                🎓 GAZEPASS <span class="logo-tag">| Terminal</span>
+            </a>
+            <a href="/" class="nav-btn">🏠 Home</a>
+        </div>
+    </header>
+
+    <main class="student-main-container">
+        <!-- Page Title Banner -->
+        <div class="student-hero animate-fade-up">
+            <h1>Student Attendance Terminal</h1>
+            <p>Look into the camera frame and follow the target dot to verify identity.</p>
+        </div>
+
+        <!-- Main Responsive Layout Grid (80% Camera / 20% Details on Desktop, Stacked 100% on Mobile) -->
+        <div class="student-terminal-grid animate-fade-up delay-1">
+            
+            <!-- CAMERA FEED SECTION (Top on mobile 100% width, Left 80% on desktop) -->
+            <div class="camera-feed-section">
+                <div class="video-wrapper">
+                    <div class="video-overlay-scanline"></div>
+                    <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Live Attendance Feed">
+                </div>
+            </div>
+
+            <!-- DETAILS HUD PANEL (Below on mobile 100% width, Right 20% on desktop) -->
+            <div class="hud-details-section">
+                <div class="glass-card hud-card">
+                    
+                    <div class="hud-group">
+                        <span class="hud-label">SYSTEM STATUS</span>
+                        <div class="hud-badge-wrapper">
+                            <span class="badge badge-info" id="statusBadge">Initializing Camera...</span>
+                        </div>
+                    </div>
+
+                    <div class="hud-group hud-divider">
+                        <span class="hud-label">RECOGNIZED STUDENT</span>
+                        <strong class="hud-value-white" id="profileName">Searching...</strong>
+                    </div>
+
+                    <div class="hud-group hud-divider">
+                        <span class="hud-label">GAZE DIRECTION</span>
+                        <strong class="hud-value-primary" id="gazeDir">N/A</strong>
+                    </div>
+
+                    <div class="hud-group hud-divider" id="gazeProgressCard">
+                        <div class="progress-header">
+                            <span class="progress-title">Gaze Liveness</span>
+                            <span class="progress-count" id="progressText">0 / 2</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div id="progressBar" class="progress-bar-fill"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <button class="btn btn-secondary reset-btn" onclick="resetStudentPortal()">
+                    🔄 Reset / Next Student
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        let pollInterval = null;
+        let toastShown = false;
+        let audioPlayed = false;
+
+        function playSuccessSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+                osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.8);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.8);
+            } catch(e) {}
+        }
+
+        function showToast(msg, type='success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span>${type==='success'?'✅':'⚠️'}</span> <div>${msg}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        async function initStudentAttendance() {
+            try {
+                toastShown = false;
+                audioPlayed = false;
+                await fetch('/api/start_attendance', { method: 'POST' });
+                if (pollInterval) clearInterval(pollInterval);
+                pollInterval = setInterval(pollStatus, 300);
+            } catch (err) {
+                console.error("Error starting attendance marking:", err);
+            }
+        }
+
+        async function resetStudentPortal() {
+            try {
+                await fetch('/api/stop_attendance', { method: 'POST' });
+                setTimeout(() => {
+                    initStudentAttendance();
+                }, 300);
+            } catch(e) {}
+        }
+
+        async function pollStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                const statusBadge = document.getElementById('statusBadge');
+                const profileName = document.getElementById('profileName');
+                const gazeDir = document.getElementById('gazeDir');
+                const progressText = document.getElementById('progressText');
+                const progressBar = document.getElementById('progressBar');
+
+                profileName.innerText = data.recognized.replace(/_/g, ' ');
+                gazeDir.innerText = data.gaze;
+
+                if (data.state === "mark") {
+                    if (data.recognized === "Unknown") {
+                        statusBadge.innerText = "Align Face in Frame";
+                        statusBadge.className = "badge badge-info";
+                        progressText.innerText = `0 / ${data.total_waypoints || 3}`;
+                        progressBar.style.width = "0%";
+                    } else {
+                        statusBadge.innerText = "Follow the Moving Dot!";
+                        statusBadge.className = "badge badge-warning";
+                        
+                        const wp = data.waypoint || 0;
+                        const total = data.total_waypoints || 3;
+                        progressText.innerText = `${wp} / ${total}`;
+                        progressBar.style.width = `${(wp / total) * 100}%`;
+                        progressBar.style.background = "var(--primary)";
+                    }
+                } else if (data.state === "success_feedback") {
+                    if (!toastShown) {
+                        playSuccessSound();
+                        showToast(`Attendance marked successfully for ${data.recognized.replace(/_/g, ' ')}!`, 'success');
+                        toastShown = true;
+                    }
+                    statusBadge.innerText = "ATTENDANCE VERIFIED!";
+                    statusBadge.className = "badge badge-success";
+                    const total = data.total_waypoints || 3;
+                    progressText.innerText = `${total} / ${total}`;
+                    progressBar.style.width = "100%";
+                    progressBar.style.background = "var(--success)";
+ 
+                    // Auto-reset after 3.5 seconds for next student
+                    setTimeout(() => {
+                        if (toastShown) resetStudentPortal();
+                    }, 3500);
+                } else if (data.state === "fail_feedback") {
+                    if (!audioPlayed) {
+                        showToast("Verification failed. Please look at the moving dot carefully.", "error");
+                        audioPlayed = true;
+                    }
+                    statusBadge.innerText = "VERIFICATION FAILED";
+                    statusBadge.className = "badge badge-danger";
+                    progressText.innerText = `0 / ${data.total_waypoints || 3}`;
+                    progressBar.style.width = "0%";
+                } else {
+                    statusBadge.innerText = "Ready";
+                    statusBadge.className = "badge badge-info";
+                }
+            } catch(err) {
+                console.error("Error polling status:", err);
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initStudentAttendance();
+        });
+    </script>
+</body>
+</html>

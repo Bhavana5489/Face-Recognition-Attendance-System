@@ -1,0 +1,11 @@
+{
+    "student_id": "TEST-002",
+    "session_id": "20260817_001223",
+    "camera_id": 0,
+    "timestamp": "2026-08-17T00:12:23.157456",
+    "lighting_condition": "normal",
+    "distance": "medium",
+    "glasses": false,
+    "dataset_type": "recognition",
+    "category": "impostor"
+}

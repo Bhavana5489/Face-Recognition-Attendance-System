@@ -1,0 +1,500 @@
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 656, in generate
+    print(f"[ChallengeEngine] Attendance marked for {recognized_name}")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\face_detection\attendance\server.py", line 332, in process_frame
+    t0 = time.time()
+                 ~^^
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 48, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 656, in generate
+    print(f"[ChallengeEngine] Attendance marked for {recognized_name}")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\face_detection\attendance\server.py", line 332, in process_frame
+    t0 = time.time()
+                 ~^^
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 48, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 656, in generate
+    print(f"[ChallengeEngine] Attendance marked for {recognized_name}")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\face_detection\attendance\server.py", line 332, in process_frame
+    t0 = time.time()
+                 ~^^
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 48, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 656, in generate
+    print(f"[ChallengeEngine] Attendance marked for {recognized_name}")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\face_detection\attendance\server.py", line 332, in process_frame
+    t0 = time.time()
+                 ~^^
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 48, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 656, in generate
+    print(f"[ChallengeEngine] Attendance marked for {recognized_name}")
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\face_detection\attendance\server.py", line 455, in process_frame
+    challenge_engine.active_session["recognition_session_id"] = recognition_session_id
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\face_detection\attendance\server.py", line 283, in update
+    if elapsed >= 0.50 and face_bbox is not None:
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\projects\face_detection\attendance\server.py", line 228, in _get_pupil_x_ratio_average
+    eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv_contrib\modules\xobjdetect\src\cascadedetect.cpp:1689: error: (-215:Assertion failed) !empty() in function 'cv::CascadeClassifier::detectMultiScale'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 599, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 274, in process_frame
+    box_color = GREEN_COLOR
+                ^^^^^^^^^^^
+NameError: name 'GREEN_COLOR' is not defined
+

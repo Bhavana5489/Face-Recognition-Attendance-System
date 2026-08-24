@@ -159,24 +159,29 @@
                         progressBar.style.width = `${(wp / 2) * 100}%`;
                     }
                 } else if (data.state === "success_feedback") {
-                    if (!audioPlayed) {
+                    // Stop polling to avoid duplicate notifications
+                    if (pollInterval) clearInterval(pollInterval);
+                    if (!toastShown) {
                         playSuccessSound();
-                        audioPlayed = true;
+                        showToast("Attendance successfully verified!", "success");
+                        toastShown = true;
                     }
                     statusBadge.innerText = "VERIFIED!";
-                    showToast("Attendance successfully verified!", "success");
                     statusBadge.className = "badge badge-success";
                     progressText.innerText = "2 / 2";
                     progressBar.style.width = "100%";
                     progressBar.style.background = "var(--success)";
-                    
                     // Redirect back to dashboard after verification success
                     setTimeout(() => {
                         stopAttendance();
                     }, 2500);
                 } else if (data.state === "fail_feedback") {
+                    if (!audioPlayed) {
+                        // Using audioPlayed as a general 'feedback_handled' flag
+                        showToast("Verification failed. Please try again.", "error");
+                        audioPlayed = true;
+                    }
                     statusBadge.innerText = "FAILED VERIFICATION";
-                    showToast("Verification failed. Please try again.", "error");
                     statusBadge.className = "badge badge-danger";
                     progressText.innerText = "0 / 2";
                     progressBar.style.width = "0%";
