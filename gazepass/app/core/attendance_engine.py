@@ -243,6 +243,16 @@ class AttendanceEngine:
                 student_name=student_name
             )
         elif identity_decision == "UNKNOWN":
+            TERMINAL_STATES = {"COMPLETED", "FAILED", "TIMEOUT", "INCONCLUSIVE"}
+            if challenge_state.upper() not in TERMINAL_STATES:
+                return AttendanceDecision(
+                    attendance_state="RECOGNITION_PENDING",
+                    challenge_command=cmd,
+                    identity_state="UNKNOWN",
+                    liveness_state="PENDING",
+                    student_name=student_name,
+                    failure_reason="Recognition in progress"
+                )
             return AttendanceDecision(
                 attendance_state="FAILED",
                 challenge_command=cmd,
@@ -252,6 +262,16 @@ class AttendanceEngine:
                 failure_reason="Unknown face identity"
             )
         elif identity_decision == "UNCERTAIN":
+            TERMINAL_STATES = {"COMPLETED", "FAILED", "TIMEOUT", "INCONCLUSIVE"}
+            if challenge_state.upper() not in TERMINAL_STATES:
+                return AttendanceDecision(
+                    attendance_state="RECOGNITION_PENDING",
+                    challenge_command=cmd,
+                    identity_state="UNCERTAIN",
+                    liveness_state="PENDING",
+                    student_name=student_name,
+                    failure_reason="Recognition in progress"
+                )
             return AttendanceDecision(
                 attendance_state="RETRY",
                 challenge_command=cmd,

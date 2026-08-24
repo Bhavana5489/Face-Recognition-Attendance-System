@@ -3,7 +3,7 @@ directional_ratio: 1.5
 center_distance_penalty: 0.1
 
 recognition:
-  cosine_threshold: 0.70
+  cosine_threshold: 0.60
   margin_threshold: 0.05
   temporal_threshold: 0.60
 

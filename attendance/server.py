@@ -895,9 +895,19 @@ def get_status():
             else:
                 ui_state = "mark"
 
+    recognized_name = shared_status["student_name"]
+    if current_mode == "mark" and tids:
+        active_tid = tids[0]
+        session = attendance_engine.sessions.get(active_tid)
+        if session:
+            active_sess = session.challenge_engine.active_session
+            if active_sess and active_sess["state"] not in [ChallengeState.WAITING, ChallengeState.BASELINE_ACQUISITION]:
+                if recognized_name == "Unknown":
+                    recognized_name = "Authenticating Student"
+
     return jsonify({
         "state": ui_state,
-        "recognized": shared_status["student_name"],
+        "recognized": recognized_name,
         "message": shared_status["message"],
         "register_step": step,
         "latest_metrics": latest_metrics,

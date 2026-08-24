@@ -176,7 +176,8 @@ class ActiveChallengeEngine:
             elif session["state"] == ChallengeState.BASELINE_ACQUISITION:
                 # Enforce Quality & Stability gates on baseline observations
                 # User must look approximately straight (center head pose)
-                if face_quality >= 0.40 and observation.confidence >= 0.30:
+                required_conf = 0.30 if observation.source == "FULL" else 0.10
+                if face_quality >= 0.40 and observation.confidence >= required_conf:
                     if abs(observation.yaw) <= 15.0 and abs(observation.pitch) <= 15.0:
                         session["baseline_observations"].append(observation)
                         if len(session["baseline_observations"]) > session["max_samples"]:
@@ -269,7 +270,8 @@ class ActiveChallengeEngine:
 
                     condition_met = False
                     
-                    if observation.confidence > 0.15:
+                    min_conf = 0.15 if observation.source == "FULL" else 0.10
+                    if observation.confidence >= min_conf:
                         if cmd == "LEFT":
                             condition_met = (med_dx <= -T_x) and (abs(med_dy) <= T_y) and (abs(med_dx) >= R * abs(med_dy))
                         elif cmd == "RIGHT":

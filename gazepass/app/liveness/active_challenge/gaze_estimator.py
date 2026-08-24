@@ -181,7 +181,8 @@ class FallbackGazeEstimator(GazeEstimator):
             pass
         else:
             # PUPIL_INVALID
-            final_confidence = 0.0
+            # Provide a low but non-zero fallback confidence for degraded mode instead of discarding completely
+            final_confidence = 0.12
             
         return norm_x, norm_y, final_confidence
 
