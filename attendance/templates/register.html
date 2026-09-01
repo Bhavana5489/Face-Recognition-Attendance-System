@@ -4,24 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register Student - GazePass</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=8">
 </head>
 <body>
-
     <header>
         <div class="nav-container">
-            <a href="/" class="logo">🎯 GAZEPASS</a>
+            <a href="/" class="logo">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                GAZEPASS
+            </a>
             <div class="nav-links">
-                <a href="/" class="nav-btn">Dashboard</a>
-                <a href="/register_page" class="nav-btn active">Register Student</a>
-                <a href="/mark_page" class="nav-btn">Mark Attendance</a>
+                <a href="/admin" class="nav-btn">Admin Portal</a>
+                <a href="/student" class="nav-btn">Student Portal</a>
             </div>
         </div>
     </header>
 
-    <main style="max-width: 900px;">
-        <div class="glass-card">
-            <h2 class="title-glow" style="margin-bottom: 0.5rem;">Register New Student</h2>
+    <main class="admin-main" style="max-width: 900px; margin: 0 auto;">
+        <div class="card">
+            <h2 style="margin-bottom: 0.5rem;">Register New Student</h2>
             <p style="color: var(--text-muted); margin-bottom: 2rem;">
                 Enter the student's name, then follow the pose instructions to scan your face.
             </p>
@@ -29,53 +30,52 @@
             <div class="grid-2" style="grid-template-columns: 1.3fr 1fr; align-items: start;">
                 <!-- Video Stream Feed -->
                 <div>
-                    <div class="video-wrapper">
-                        <div class="video-overlay-scanline"></div>
-                        <svg class="face-guide-svg" viewBox="0 0 100 120" preserveAspectRatio="none">
-                            <ellipse cx="50" cy="60" rx="35" ry="50" />
+                    <div style="position: relative; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border); background: #E2E8F0; width: 100%; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center;">
+                        <svg class="face-guide" viewBox="0 0 100 120" preserveAspectRatio="none" style="width: 50%; height: 70%;">
+                            <ellipse cx="50" cy="60" rx="35" ry="50" style="fill: none; stroke: rgba(15, 23, 42, 0.3); stroke-width: 2; stroke-dasharray: 4 4;" id="scanGuide" />
                         </svg>
-                        <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Video Stream">
-                        <div class="recording-badge" id="recBadge" style="display: none;">
-                            <span class="recording-dot"></span>
-                            SCANNING ACTIVE
+                        <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Video Stream" style="width: 100%; height: 100%; object-fit: cover;">
+                        <div class="badge badge-warning" id="recBadge" style="display: none; position: absolute; top: 1rem; left: 1rem; z-index: 10;">
+                            <span style="display:inline-block; width:6px; height:6px; background:var(--warning); border-radius:50%; margin-right:4px;"></span>
+                            Scanning Active
                         </div>
                     </div>
                 </div>
 
                 <!-- Registration Actions Form -->
                 <div id="formSection" style="padding-top: 1rem;">
-                    <div class="form-group">
-                        <label for="studentName">Student Full Name</label>
+                    <div style="margin-bottom: 1.5rem; width: 100%;">
+                        <label for="studentName" style="display: block; font-size: 0.9rem; font-weight: 500; color: var(--text-muted); margin-bottom: 0.5rem;">Student Full Name</label>
                         <input type="text" id="studentName" placeholder="e.g. John Doe" class="input-glow" autocomplete="off">
                     </div>
-                    <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="startRegistration()">
-                        🎥 Start Face Registration
+                    <button class="btn btn-primary" style="width: 100%; margin-bottom: 0.8rem;" onclick="startRegistration()">
+                        Start Face Registration
                     </button>
-                    <a href="/" class="btn btn-secondary" style="width: 100%; margin-top: 0.8rem;">
+                    <a href="/" class="btn btn-secondary" style="width: 100%;">
                         Cancel
                     </a>
                 </div>
 
                 <!-- Progress / Instructions Panel (hidden initially) -->
                 <div id="recordingSection" style="display: none; padding-top: 0.5rem;">
-                    <h3 style="color: var(--warning); margin-bottom: 1rem; font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.5px;">Biometric Scan Progress</h3>
+                    <h3 style="color: var(--primary); margin-bottom: 1rem; letter-spacing: 0.5px;">Scan Progress</h3>
                     <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
-                        Adjust your head to each pose below. The system automatically proceeds as soon as it captures a high-confidence, sharp face template.
+                        Adjust your head to each pose below. The system automatically proceeds as soon as it captures a high-quality template.
                     </p>
                     
                     <!-- Pose steps list -->
                     <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-                        <div id="stepFront" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); transition: all 0.3s ease;">
-                            <span style="font-weight: 500; font-size: 0.92rem; color: #eee;">1. Look Straight (Front Pose)</span>
-                            <span id="badgeFront" class="badge" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted);">Pending</span>
+                        <div id="stepFront" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); transition: all 0.3s ease;">
+                            <span style="font-weight: 500; font-size: 0.92rem;">1. Look Straight</span>
+                            <span id="badgeFront" class="badge" style="color: var(--text-muted); border: 1px solid var(--border);">Pending</span>
                         </div>
-                        <div id="stepUp" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); transition: all 0.3s ease;">
-                            <span style="font-weight: 500; font-size: 0.92rem; color: #eee;">2. Tilt Head Upward</span>
-                            <span id="badgeUp" class="badge" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted);">Pending</span>
+                        <div id="stepUp" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); transition: all 0.3s ease;">
+                            <span style="font-weight: 500; font-size: 0.92rem;">2. Tilt Head Up</span>
+                            <span id="badgeUp" class="badge" style="color: var(--text-muted); border: 1px solid var(--border);">Pending</span>
                         </div>
-                        <div id="stepDown" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); transition: all 0.3s ease;">
-                            <span style="font-weight: 500; font-size: 0.92rem; color: #eee;">3. Tilt Head Downward</span>
-                            <span id="badgeDown" class="badge" style="padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted);">Pending</span>
+                        <div id="stepDown" style="display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); transition: all 0.3s ease;">
+                            <span style="font-weight: 500; font-size: 0.92rem;">3. Tilt Head Down</span>
+                            <span id="badgeDown" class="badge" style="color: var(--text-muted); border: 1px solid var(--border);">Pending</span>
                         </div>
                     </div>
                 </div>
@@ -83,14 +83,31 @@
         </div>
     </main>
 
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <script>
         let pollInterval = null;
+
+        function showToast(message, type='success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icon = type === 'success' ? '<polyline points="20 6 9 17 4 12"></polyline>' : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+            toast.innerHTML = `<svg class="icon" viewBox="0 0 24 24">${icon}</svg> <div>${message}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
         async function startRegistration() {
             const nameInput = document.getElementById('studentName');
             const name = nameInput.value.trim();
             if (!name) {
-                alert("Please enter the student's name first.");
+                showToast("Please enter the student's name first.", "error");
                 return;
             }
 
@@ -103,18 +120,15 @@
                 const data = await res.json();
                 
                 if (data.success) {
-                    // Show capture section, hide form
                     document.getElementById('formSection').style.display = 'none';
                     document.getElementById('recordingSection').style.display = 'block';
                     document.getElementById('recBadge').style.display = 'flex';
-                    
                     startPollingStatus();
                 } else {
-                    alert(data.message || "Could not start registration");
+                    showToast(data.message || "Could not start registration", "error");
                 }
             } catch (err) {
-                console.error("Error starting registration:", err);
-                alert("An error occurred starting registration.");
+                showToast("An error occurred starting registration.", "error");
             }
         }
 
@@ -127,7 +141,6 @@
                     const step = data.register_step;
                     const state = data.state;
                     
-                    // Reset all styles to default
                     resetStepUI("stepFront", "badgeFront");
                     resetStepUI("stepUp", "badgeUp");
                     resetStepUI("stepDown", "badgeDown");
@@ -149,51 +162,53 @@
                         clearInterval(pollInterval);
                         completeRegistration();
                     }
-                } catch (err) {
-                    console.error("Status polling error:", err);
-                }
+                } catch (err) { }
             }, 500);
         }
 
         function resetStepUI(stepId, badgeId) {
             const stepDiv = document.getElementById(stepId);
             const badgeSpan = document.getElementById(badgeId);
-            stepDiv.style.borderColor = "rgba(255,255,255,0.08)";
-            stepDiv.style.background = "rgba(255,255,255,0.02)";
+            stepDiv.style.borderColor = "var(--border)";
+            stepDiv.style.background = "var(--bg-surface)";
             badgeSpan.innerText = "Pending";
+            badgeSpan.className = "badge";
             badgeSpan.style.color = "var(--text-muted)";
-            badgeSpan.style.borderColor = "rgba(255, 255, 255, 0.1)";
+            badgeSpan.style.borderColor = "var(--border)";
             badgeSpan.style.background = "transparent";
+            document.getElementById('scanGuide').style.stroke = "rgba(15, 23, 42, 0.3)";
+            document.getElementById('scanGuide').style.strokeDasharray = "4 4";
         }
 
         function setStepScanning(stepId, badgeId) {
             const stepDiv = document.getElementById(stepId);
             const badgeSpan = document.getElementById(badgeId);
-            stepDiv.style.borderColor = "rgba(0, 242, 254, 0.4)";
-            stepDiv.style.background = "rgba(0, 242, 254, 0.05)";
+            stepDiv.style.borderColor = "var(--primary)";
+            stepDiv.style.background = "#E0F2FE";
             badgeSpan.innerText = "Scanning...";
-            badgeSpan.style.color = "var(--primary)";
-            badgeSpan.style.borderColor = "rgba(0, 242, 254, 0.3)";
-            badgeSpan.style.background = "rgba(0, 242, 254, 0.1)";
+            badgeSpan.className = "badge badge-info";
+            badgeSpan.style.borderColor = "var(--primary)";
+            document.getElementById('scanGuide').style.stroke = "var(--primary)";
+            document.getElementById('scanGuide').style.strokeDasharray = "none";
         }
 
         function setStepCaptured(stepId, badgeId) {
             const stepDiv = document.getElementById(stepId);
             const badgeSpan = document.getElementById(badgeId);
-            stepDiv.style.borderColor = "rgba(0, 255, 135, 0.3)";
-            stepDiv.style.background = "rgba(0, 255, 135, 0.04)";
+            stepDiv.style.borderColor = "var(--success)";
+            stepDiv.style.background = "var(--success-bg)";
             badgeSpan.innerText = "Captured ✓";
-            badgeSpan.style.color = "var(--success)";
-            badgeSpan.style.borderColor = "rgba(0, 255, 135, 0.3)";
-            badgeSpan.style.background = "rgba(0, 255, 135, 0.1)";
+            badgeSpan.className = "badge badge-success";
+            badgeSpan.style.borderColor = "var(--success)";
         }
 
         function completeRegistration() {
             document.getElementById('recBadge').style.display = 'none';
+            document.getElementById('scanGuide').style.stroke = "var(--success)";
             document.getElementById('recordingSection').innerHTML = `
-                <h3 style="color: var(--success); margin-bottom: 0.8rem; font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.5px;">Registration Finished!</h3>
+                <h3 style="color: var(--success); margin-bottom: 0.8rem;">Registration Finished!</h3>
                 <p style="font-size: 0.95rem; color: var(--text-muted); line-height: 1.6;">
-                    All poses registered and FaceNet embeddings optimized successfully. Returning to dashboard...
+                    All poses registered successfully. Returning to dashboard...
                 </p>
             `;
             setTimeout(() => {
@@ -201,30 +216,5 @@
             }, 3000);
         }
     </script>
-
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
-    <script>
-        function showToast(message, type='success') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            
-            const icon = type === 'success' ? '✅' : '⚠️';
-            toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
-            
-            container.appendChild(toast);
-            
-            // Trigger reflow to start transition
-            setTimeout(() => toast.classList.add('show'), 10);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-    </script>
-
 </body>
 </html>

@@ -1,0 +1,1032 @@
+import os
+import sys
+import time
+import cv2
+import numpy as np
+import threading
+from flask import Flask, render_template, Response, request, jsonify
+from flask_cors import CORS
+
+# Add Gazepass root to path to import the new backend
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+GAZEPASS_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', 'gazepass'))
+sys.path.insert(0, GAZEPASS_DIR)
+
+from app.database.db_core import DatabaseManager, VectorSearchEngine
+from app.vision.detector.yunet import YuNetDetector
+from app.vision.tracker.bytetrack import ByteTracker
+from app.vision.landmarks.facex import FaceXLandmarker
+from app.vision.pose.head_pose import HeadPoseEstimator
+from app.vision.quality.engine import FaceQualityEngine
+from app.vision.recognition.sface import SFaceRecognizer
+from app.liveness.passive_pad.minifasnet import MiniFASNetEnsemble
+from app.liveness.active_challenge.challenge_engine import ActiveChallengeEngine
+from app.liveness.active_challenge.gaze_estimator import GazeBlinkEstimator
+from app.core.attendance_engine import AttendanceEngine
+from app.enrollment.video_parser import VideoEnrollmentParser
+
+app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+CORS(app)
+
+# ── Gazepass Enterprise Backend Initialization ──────────────────────────
+print("[*] Initializing Gazepass 2026 Enterprise Backend...")
+
+MODELS_DIR = os.path.join(GAZEPASS_DIR, 'models')
+DB_PATH = os.path.join(GAZEPASS_DIR, 'gazepass.db')
+
+db_manager = DatabaseManager(DB_PATH)
+vector_engine = VectorSearchEngine(db_manager)
+
+detector = YuNetDetector(os.path.join(MODELS_DIR, 'detector', 'face_detection_yunet_2023mar.onnx'))
+sface = SFaceRecognizer(os.path.join(MODELS_DIR, 'recognition', 'face_recognition_sface_2021dec.onnx'))
+
+# Fallback paths if FaceX/MiniFASNet aren't strictly downloaded yet
+facex_path = os.path.join(MODELS_DIR, 'landmarks', 'facex_landmark.onnx')
+minifas_v1_path = os.path.join(MODELS_DIR, 'liveness', 'minifasnet_v1se.onnx')
+minifas_v2_path = os.path.join(MODELS_DIR, 'liveness', 'minifasnet_v2.onnx')
+
+landmarker = FaceXLandmarker(facex_path)
+pad_ensemble = MiniFASNetEnsemble(minifas_v1_path, minifas_v2_path)
+
+quality_engine = FaceQualityEngine()
+tracker = ByteTracker()
+attendance_engine = AttendanceEngine(db_manager)
+challenge_engine = ActiveChallengeEngine()
+gaze_estimator = GazeBlinkEstimator()
+
+# Global State
+current_mode = "idle" # idle, register, mark
+registration_parser = None
+registration_student_id = None
+shared_status = {"message": "Idle", "student_name": "Unknown"}
+_last_detections = []  # Latest frame detections — read by DynamicZoom (display only)
+
+# ── Camera Threading ────────────────────────────────────────────────
+class CameraStream:
+    def __init__(self):
+        self.cap = None
+        self.latest_frame = None
+        self.lock = threading.Lock()
+        self.running = False
+        self.clients = 0
+        
+    def acquire(self):
+        with self.lock:
+            self.clients += 1
+            if not self.running:
+                self.start()
+                
+    def release(self):
+        with self.lock:
+            self.clients -= 1
+            if self.clients <= 0:
+                self.clients = 0
+                self.stop()
+                
+    def start(self):
+        if self.running: return
+        self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        self.running = True
+        threading.Thread(target=self._update, daemon=True).start()
+        
+    def _update(self):
+        while self.running and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if ret:
+                frame = cv2.flip(frame, 1)
+                with self.lock:
+                    self.latest_frame = frame
+            else:
+                time.sleep(0.01)
+                
+    def stop(self):
+        self.running = False
+        if self.cap:
+            self.cap.release()
+
+cam_stream = CameraStream()
+
+import threading
+import queue
+
+class InferenceWorker:
+    """Runs heavy AI models on a background thread to prevent UI blocking (Phase 10)."""
+    def __init__(self):
+        self.q = queue.Queue(maxsize=2)
+        self.results = {}
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+        
+    def _run(self):
+        while True:
+            item = self.q.get()
+            if item is None: continue
+            frame, bbox, best_det, track_id, conf = item
+            
+            try:
+                # 1. FaceX (Dense Landmarks)
+                dense_landmarks = landmarker.get_landmarks(frame, bbox)
+                
+                # 2. Quality
+                yaw, pitch, roll = 0.0, 0.0, 0.0
+                pose_estimator = HeadPoseEstimator((frame.shape[1], frame.shape[0]))
+                if dense_landmarks is not None and len(dense_landmarks) == 98:
+                    yaw, pitch, roll = pose_estimator.estimate_facex(dense_landmarks)
+                else:
+                    yaw, pitch, roll = pose_estimator.estimate(best_det.landmarks)
+                    
+                quality_eval = quality_engine.evaluate(frame, bbox, (yaw, pitch, roll), conf)
+                
+                # 3. PAD
+                liveness_score = pad_ensemble.evaluate(frame, bbox)
+                
+                # 4. SFace
+                aligned_face = sface.align(frame, best_det)
+                emb = sface.get_embedding(aligned_face)
+                matches = vector_engine.search(emb, top_k=5)
+                
+                self.results[track_id] = {
+                    "dense_landmarks": dense_landmarks,
+                    "yaw": yaw, "pitch": pitch, "roll": roll,
+                    "quality_eval": quality_eval,
+                    "liveness_score": liveness_score,
+                    "matches": matches,
+                    "emb": emb,
+                    "timestamp": time.time()
+                }
+            except Exception as e:
+                print(f"[Worker Error] {e}")
+            finally:
+                self.q.task_done()
+                
+    def push(self, frame, bbox, best_det, track_id, conf):
+        if self.q.qsize() < 2:
+            self.q.put((frame, bbox, best_det, track_id, conf))
+            
+    def get_result(self, track_id):
+        return self.results.get(track_id)
+
+inference_worker = InferenceWorker()
+
+# ── Dynamic Digital Zoom (display-only, zero impact on AI pipeline) ──────────
+class DynamicZoom:
+    """
+    Applies smooth digital zoom to the MJPEG display frame.
+    - Single face far away → crop in on the face with padding.
+    - Multiple faces       → crop to the union bbox of all faces.
+    - Gaze dot active      → immediately fall back to full frame
+                             so the challenge dot is never clipped.
+    All zoom is applied AFTER process_frame() draws its overlays, so the AI
+    pipeline (detection, recognition, PAD, gaze) always runs on the full frame.
+    """
+    LERP = 0.08          # Smoothing factor per frame (~0.08 ≈ ~1s to settle)
+    ZOOM_AREA_THRESHOLD = 0.20  # Skip zoom when face(s) cover ≥20% of frame area
+    PADDING_RATIO = 0.75  # Pad each side by this fraction of the face dimension
+
+    def __init__(self):
+        self.roi = None  # (x1, y1, x2, y2) floats; None = uninitialized
+
+    def _compute_target(self, frame_h: int, frame_w: int,
+                        detections: list, gaze_active: bool) -> tuple:
+        full = (0.0, 0.0, float(frame_w), float(frame_h))
+        # Safety exit: no faces or gaze challenge running → full frame
+        if gaze_active or not detections:
+            return full
+
+        # Union bounding box across all detected faces
+        all_x1 = min(d.bbox[0] for d in detections)
+        all_y1 = min(d.bbox[1] for d in detections)
+        all_x2 = max(d.bbox[0] + d.bbox[2] for d in detections)
+        all_y2 = max(d.bbox[1] + d.bbox[3] for d in detections)
+        face_w  = all_x2 - all_x1
+        face_h  = all_y2 - all_y1
+
+        # Face(s) already large enough — no zoom needed
+        if (face_w * face_h) / (frame_w * frame_h) >= self.ZOOM_AREA_THRESHOLD:
+            return full
+
+        # Expand union bbox with padding
+        pad_x = face_w * self.PADDING_RATIO
+        pad_y = face_h * self.PADDING_RATIO
+        x1 = max(0.0, all_x1 - pad_x)
+        y1 = max(0.0, all_y1 - pad_y)
+        x2 = min(float(frame_w), all_x2 + pad_x)
+        y2 = min(float(frame_h), all_y2 + pad_y)
+
+        # Fix aspect ratio to match frame — prevents stretching
+        roi_w, roi_h = x2 - x1, y2 - y1
+        frame_ar = frame_w / frame_h
+        if roi_h > 0 and (roi_w / roi_h) > frame_ar:
+            new_h  = roi_w / frame_ar
+            extra  = (new_h - roi_h) / 2.0
+            y1     = max(0.0, y1 - extra)
+            y2     = min(float(frame_h), y1 + new_h)
+            y1     = max(0.0, y2 - new_h)
+        elif roi_w > 0:
+            new_w  = roi_h * frame_ar
+            extra  = (new_w - roi_w) / 2.0
+            x1     = max(0.0, x1 - extra)
+            x2     = min(float(frame_w), x1 + new_w)
+            x1     = max(0.0, x2 - new_w)
+
+        return (x1, y1, x2, y2)
+
+    def apply(self, frame: np.ndarray, detections: list, gaze_active: bool) -> np.ndarray:
+        """Lerps toward the target ROI and returns the cropped+upscaled frame."""
+        h, w = frame.shape[:2]
+        if self.roi is None:
+            self.roi = (0.0, 0.0, float(w), float(h))
+
+        target = self._compute_target(h, w, detections, gaze_active)
+
+        # Exponential lerp: faster when zooming out (gaze active), smooth otherwise
+        lerp = 0.20 if gaze_active else self.LERP
+        self.roi = tuple(self.roi[i] + (target[i] - self.roi[i]) * lerp for i in range(4))
+
+        x1, y1, x2, y2 = (int(round(v)) for v in self.roi)
+        x1, y1 = max(0, x1), max(0, y1)
+        x2, y2 = min(w, x2), min(h, y2)
+        if x2 <= x1 or y2 <= y1:
+            return frame
+
+        crop = frame[y1:y2, x1:x2]
+        return cv2.resize(crop, (w, h), interpolation=cv2.INTER_LINEAR)
+
+
+dynamic_zoom = DynamicZoom()
+
+# ── Legacy-Proven GazeSession (ported from app_legacy.py) ───────────────
+DOT_RADIUS = 18
+GAZE_MARGIN = 0.05
+RED_COLOR = (30, 30, 220)
+GREEN_COLOR = (30, 210, 30)
+
+def _get_pupil_x_ratio(eye_roi_bgr):
+    """Find horizontal pupil ratio (0=left, 1=right) in an eye crop."""
+    if eye_roi_bgr is None or eye_roi_bgr.size == 0:
+        return None
+    gray = cv2.cvtColor(eye_roi_bgr, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+    margin_x = int(w * 0.25)
+    margin_y = int(h * 0.30)
+    crop = gray[margin_y:h-margin_y, margin_x:w-margin_x]
+    if crop.size == 0:
+        return None
+    crop = cv2.GaussianBlur(crop, (5, 5), 0)
+    _, _, min_loc, _ = cv2.minMaxLoc(crop)
+    cx = min_loc[0] + margin_x
+    return float(cx / w)
+
+def _get_pupil_x_ratio_average(frame, face_bbox, yunet_landmarks=None):
+    """Average pupil X-ratio across both eyes using YuNet landmarks."""
+    if yunet_landmarks is not None and len(yunet_landmarks) >= 2:
+        # YuNet 5-point: [right_eye, left_eye, nose, right_mouth, left_mouth]
+        right_eye = np.array(yunet_landmarks[0])
+        left_eye  = np.array(yunet_landmarks[1])
+        eye_dist = float(np.linalg.norm(left_eye - right_eye))
+        if eye_dist > 0:
+            crop_w = int(eye_dist * 0.35)
+            crop_h = int(eye_dist * 0.25)
+            h_img, w_img = frame.shape[:2]
+            ratios = []
+            for pt in [right_eye, left_eye]:
+                ex, ey = int(pt[0]), int(pt[1])
+                ex_min = max(0, ex - crop_w)
+                ex_max = min(w_img - 1, ex + crop_w)
+                ey_min = max(0, ey - crop_h)
+                ey_max = min(h_img - 1, ey + crop_h)
+                eye_roi = frame[ey_min:ey_max, ex_min:ex_max]
+                if eye_roi.size > 0:
+                    r = _get_pupil_x_ratio(eye_roi)
+                    if r is not None:
+                        ratios.append(r)
+            if ratios:
+                return float(np.mean(ratios))
+    # Fallback: use face bbox + Haar eye cascade
+    fx, fy, fw, fh = face_bbox
+    face_roi = frame[fy:fy+fh, fx:fx+fw]
+    if face_roi.size == 0:
+        return None
+    face_gray = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+    eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
+    eyes = eye_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
+    if len(eyes) == 0:
+        return None
+    ratios = []
+    for (ex, ey, ew, eh) in eyes[:2]:
+        eye_roi = face_roi[ey:ey+int(eh*0.65), ex:ex+ew]
+        r = _get_pupil_x_ratio(eye_roi)
+        if r is not None:
+            ratios.append(r)
+    return float(np.mean(ratios)) if ratios else None
+
+def _generate_waypoints(frame_w, frame_h):
+    """Generate left and right waypoints at random Y positions on the screen extremes."""
+    margin_x = 60
+    margin_y = 80
+    zones = [
+        (margin_x, frame_w // 3, margin_y, frame_h - margin_y, "left"),
+        (frame_w * 2 // 3, frame_w - margin_x, margin_y, frame_h - margin_y, "right"),
+    ]
+    import random
+    random.shuffle(zones)
+    waypoints = []
+    for (xmin, xmax, ymin, ymax, label) in zones:
+        x = random.randint(int(xmin), int(xmax))
+        y = random.randint(int(ymin), int(ymax))
+        waypoints.append((x, y, label))
+    return waypoints
+
+class GazeSession:
+    """Manages the red-dot gaze liveness challenge (ported from app_legacy.py)."""
+    def __init__(self, frame_w, frame_h):
+        self.waypoints = _generate_waypoints(frame_w, frame_h)
+        self.wp_idx = 0
+        self.wp_start = time.time()
+        self.wp_duration = 1.5  # seconds per dot
+        self.gaze_samples = []
+        self.results = []
+        self.dot_pos = (self.waypoints[0][0], self.waypoints[0][1])
+        self.dot_alpha = 1.0
+        self.state = "running"  # "running", "success", "failed"
+
+    def update(self, frame, face_bbox, yunet_landmarks=None):
+        """Call each frame. Returns True when challenge is finished."""
+        now = time.time()
+        elapsed = now - self.wp_start
+        wp = self.waypoints[self.wp_idx]
+        target_x, target_y, zone_label = wp
+        self.dot_pos = (target_x, target_y)
+        self.dot_alpha = 0.7 + 0.3 * abs(np.sin(now * 6))
+
+        # Accumulate pupil samples after 0.5s reaction window
+        if elapsed >= 0.50 and face_bbox is not None:
+            r = _get_pupil_x_ratio_average(frame, face_bbox, yunet_landmarks)
+            if r is not None:
+                self.gaze_samples.append(r)
+
+        if elapsed >= self.wp_duration:
+            stop_avg = float(np.mean(self.gaze_samples)) if self.gaze_samples else None
+            self.results.append((zone_label, stop_avg))
+            self.wp_idx += 1
+            self.wp_start = now
+            self.gaze_samples = []
+
+            if self.wp_idx < len(self.waypoints):
+                nxt = self.waypoints[self.wp_idx]
+                self.dot_pos = (nxt[0], nxt[1])
+            else:
+                # Evaluate results
+                left_ratio  = next((v for z, v in self.results if z == "left"),  None)
+                right_ratio = next((v for z, v in self.results if z == "right"), None)
+                passed = False
+                if left_ratio is not None and right_ratio is not None:
+                    diff = right_ratio - left_ratio
+                    print(f"[GazeSession] Relative shift: {diff:.4f} (L={left_ratio:.4f}, R={right_ratio:.4f}) -> {'PASS' if diff >= 0.05 else 'FAIL'}")
+                    # Require a meaningful horizontal shift between left and right dot windows.
+                    # 0.05 filters out up/down jitter (typically < 0.03) while allowing real gaze (typically 0.08+)
+                    if diff >= 0.05:
+                        passed = True
+                else:
+                    # Could not read pupil for one of the windows — fail safe, do not guess
+                    print(f"[GazeSession] Incomplete data: L={left_ratio}, R={right_ratio} -> FAIL")
+                    passed = False
+                self.state = "success" if passed else "failed"
+                return True  # Done
+        return False  # Still running
+
+# Per-track gaze sessions kept separately from AttendanceEngine
+_gaze_sessions = {}   # track_id -> GazeSession
+_gaze_results  = {}   # track_id -> "success" | "failed"
+
+# ── Multi-Student Batch Recognition State ────────────────────────────────
+# track_id -> {"student_id": str, "name": str, "first_seen": float, "marked": bool, "similarity": float}
+_multi_tracks   = {}
+MULTI_CONFIRM_SEC   = 2.0   # seconds of consistent recognition before marking
+MULTI_SIM_THRESHOLD = 0.60  # minimum cosine similarity to accept as a match
+
+# ── Core Video Pipeline (Phase 2 & 14) ─────────────────────────────────
+def process_frame(frame):
+    global shared_status, current_mode, registration_parser, registration_student_id, _last_detections
+    
+    # Pipeline Timings
+    t_start = time.time()
+    timings = {}
+    
+    # 1. Detection
+    t0 = time.time()
+    detections = detector.detect(frame)
+    timings['Detection'] = (time.time() - t0) * 1000
+    _last_detections = detections  # Cache for DynamicZoom (display only)
+    
+    # Format for ByteTrack
+    track_dets = [(d.bbox, d.confidence) for d in detections]
+    
+    # 2. Tracking
+    t0 = time.time()
+    active_tracks = tracker.update(track_dets)
+    timings['Tracking'] = (time.time() - t0) * 1000
+    active_track_ids = [t.track_id for t in active_tracks]
+    
+    # Cleanup lost tracks in attendance engine
+    attendance_engine.cleanup_lost_tracks(active_track_ids)
+    
+    for track in active_tracks:
+        x, y, w, h = track.bbox
+        
+        # We need the original YuNet 5-point landmarks for SFace alignment
+        # Map tracker bbox back to original detection to grab landmarks
+        best_iou = 0
+        best_det = None
+        for d in detections:
+            dx, dy, dw, dh = d.bbox
+            iou = tracker._iou(track.bbox, (dx, dy, dw, dh))
+            if iou > best_iou:
+                best_iou = iou
+                best_det = d
+                
+        if not best_det: continue
+        
+        # Push frame to background worker (Phase 10)
+        # Note: We skip pushing if we are in register mode to allow the parser to handle it synchronously.
+        if current_mode == "mark":
+            tid = track.track_id
+            h_frame, w_frame = frame.shape[:2]
+
+            # ── Phase 1: Identity recognition via gazepass backend ──────────
+            inference_worker.push(frame.copy(), track.bbox, best_det, tid, track.confidence)
+            res = inference_worker.get_result(tid)
+
+            if not res:
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (128, 128, 128), 2)
+                cv2.putText(frame, "ANALYZING...", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (128, 128, 128), 2)
+                continue
+
+            yaw, pitch, roll = res["yaw"], res["pitch"], res["roll"]
+            quality_eval  = res["quality_eval"]
+            liveness_score = res["liveness_score"]
+            matches        = res["matches"]
+            emb            = res["emb"]
+
+            # Name cache
+            if not hasattr(cam_stream, 'name_cache'):
+                cam_stream.name_cache = {}
+            def _lookup(uuid_str):
+                if uuid_str not in cam_stream.name_cache:
+                    conn = db_manager.get_connection()
+                    cur  = conn.cursor()
+                    cur.execute("SELECT name FROM students WHERE id = ?", (uuid_str,))
+                    row  = cur.fetchone()
+                    conn.close()
+                    cam_stream.name_cache[uuid_str] = row["name"] if row else uuid_str
+                return cam_stream.name_cache[uuid_str]
+
+            # Resolve identity from matches
+            recognized_id   = matches[0]["student_id"] if matches else None
+            match_similarity = float(matches[0]["similarity"]) if matches else 0.0
+            # Convert cosine similarity (-1..1) to a 0-100% accuracy value
+            accuracy_pct    = max(0, min(100, int(match_similarity * 100)))
+            recognized_name = _lookup(recognized_id) if recognized_id else "Unknown"
+            is_recognized   = recognized_id is not None and quality_eval["quality_score"] >= 0.3
+
+            # ── Phase 2: Draw green/red face box immediately ─────────────────
+            if is_recognized:
+                box_color = GREEN_COLOR
+                display_text = f"{recognized_name}  {accuracy_pct}%"
+                shared_status["student_name"] = recognized_name
+            else:
+                box_color = (0, 0, 255)
+                display_text = "Unknown"
+                # Reset gaze session if face lost
+                _gaze_sessions.pop(tid, None)
+                _gaze_results.pop(tid, None)
+
+            cv2.rectangle(frame, (x, y), (x+w, y+h), box_color, 2)
+            cv2.putText(frame, display_text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, box_color, 2)
+
+            if not is_recognized:
+                shared_status["message"] = "Unknown"
+                continue
+
+            # ── Phase 3: Gaze liveness challenge (GazeSession) ───────────────
+            # Check if already resolved (marked or absent)
+            prior_result = _gaze_results.get(tid)
+            if prior_result == "success":
+                shared_status["message"] = f"MARKED: {recognized_name}"
+                cv2.putText(frame, "✓ ATTENDANCE MARKED", (x, y+h+20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, GREEN_COLOR, 2)
+                continue
+            elif prior_result == "failed":
+                shared_status["message"] = "Absent (did not follow dots)"
+                cv2.putText(frame, "ABSENT - Did not follow dots", (x, y+h+20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2)
+                continue
+
+            # Start a new GazeSession if not running
+            if tid not in _gaze_sessions:
+                _gaze_sessions[tid] = GazeSession(w_frame, h_frame)
+
+            session = _gaze_sessions[tid]
+
+            # Get YuNet landmarks for pupil tracking
+            yunet_lm = best_det.landmarks if best_det and best_det.landmarks is not None else None
+
+            done = session.update(frame, track.bbox, yunet_lm)
+
+
+            # Draw animated red dot
+            xd, yd = session.dot_pos
+            glow_r  = int(DOT_RADIUS * 1.8)
+            overlay = frame.copy()
+            cv2.circle(overlay, (xd, yd), glow_r, (50, 50, 230), -1)
+            cv2.addWeighted(overlay, 0.3 * session.dot_alpha, frame,
+                            1 - 0.3 * session.dot_alpha, 0, frame)
+            cv2.circle(frame, (xd, yd), DOT_RADIUS, RED_COLOR, -1, cv2.LINE_AA)
+            cv2.circle(frame, (xd, yd), DOT_RADIUS // 3, (120, 120, 255), -1, cv2.LINE_AA)
+
+            dot_progress = session.wp_idx + 1
+            total_dots   = len(session.waypoints)
+            cv2.putText(frame, f"Follow the red dot ({dot_progress}/{total_dots})",
+                        (10, h_frame - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 200, 255), 2)
+
+            shared_status["message"] = f"Gaze check {dot_progress}/{total_dots}"
+
+            if done:
+                _gaze_sessions.pop(tid, None)
+                if session.state == "success":
+                    _gaze_results[tid] = "success"
+                    shared_status["message"] = f"MARKED: {recognized_name}"
+                    # Write attendance directly to DB
+                    import uuid
+                    from datetime import date
+                    try:
+                        conn = db_manager.get_connection()
+                        cur  = conn.cursor()
+                        event_id = str(uuid.uuid4())
+                        cur.execute('''
+                            INSERT INTO recognition_events
+                            (id, track_id, candidate_student_id, top1_similarity, margin, quality_score, liveness_score, decision)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (event_id, str(tid), recognized_id,
+                              float(matches[0].get("similarity", 0.9)),
+                              float(matches[0].get("margin", 0.1)),
+                              float(quality_eval["quality_score"]),
+                              float(liveness_score), "MATCH"))
+                        cur.execute('''
+                            INSERT OR IGNORE INTO attendance_records
+                            (id, student_id, recognition_event_id, attendance_date)
+                            VALUES (?, ?, ?, ?)
+                        ''', (str(uuid.uuid4()), recognized_id, event_id, date.today().isoformat()))
+                        conn.commit()
+                        conn.close()
+                        print(f"[GazeSession] Attendance marked for {recognized_name}")
+                    except Exception as db_err:
+                        print(f"[GazeSession] DB error: {db_err}")
+                else:
+                    # Failed — mark absent, do not allow retry
+                    _gaze_results[tid] = "failed"
+                    shared_status["message"] = "Absent (did not follow dots)"
+                    print(f"[GazeSession] Gaze failed for {recognized_name} -> ABSENT")
+        elif current_mode == "register":
+            # For registration we currently keep it synchronous to collect frames rapidly
+            dense_landmarks = landmarker.get_landmarks(frame, track.bbox)
+            pose_estimator = HeadPoseEstimator((frame.shape[1], frame.shape[0]))
+            if dense_landmarks is not None and len(dense_landmarks) == 98:
+                yaw, pitch, roll = pose_estimator.estimate_facex(dense_landmarks)
+            else:
+                yaw, pitch, roll = pose_estimator.estimate(best_det.landmarks)
+                
+            if registration_parser:
+                quality_eval = quality_engine.evaluate(frame, track.bbox, (yaw, pitch, roll), track.confidence)
+                
+                registration_parser.add_frame_candidate(frame, best_det, (yaw, pitch, roll))
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 255, 0), 2)
+                cv2.putText(frame, "ENROLLING...", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                
+                if not quality_eval["accepted"]:
+                    reason_str = ", ".join(quality_eval["reasons"])
+                    cv2.putText(frame, f"WAIT: {reason_str}", (x, y+h+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                    
+                poses_gathered = set([c["pose_category"] for c in registration_parser.candidate_pool])
+                shared_status["message"] = f"Frames: {len(registration_parser.candidate_pool)}/30 | Poses: {len(poses_gathered)}/3"
+                
+                has_all_poses = "FRONT" in poses_gathered and "UP" in poses_gathered and "DOWN" in poses_gathered
+                if len(registration_parser.candidate_pool) >= 30 and has_all_poses:
+                    templates = registration_parser.get_diverse_templates(sface, max_per_pose=3)
+                    for cand in templates:
+                        aligned = sface.align(cand["full_frame"], cand["best_det"])
+                        emb = sface.get_embedding(aligned)
+                        db_manager.save_template(registration_student_id, emb, {
+                                "quality_score": cand["quality_score"],
+                                "yaw": cand["pose"][0]
+                            })
+                    
+                    vector_engine.reload_gallery()
+                    current_mode = "idle"
+                    shared_status["message"] = "Registration Complete"
+            
+            
+            
+            # Render timings for dev mode
+            if current_mode == "mark":
+                y_offset = 30
+                for k, v in timings.items():
+                    cv2.putText(frame, f"{k}: {v:.1f}ms", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    y_offset += 20
+
+        elif current_mode == "multi":
+            # ── MULTI-STUDENT BATCH MODE ───────────────────────────────────
+            # Run full recognition on ALL tracked faces simultaneously.
+            # Mark present after MULTI_CONFIRM_SEC of consistent recognition.
+            tid = track.track_id
+            now = time.time()
+
+            inference_worker.push(frame.copy(), track.bbox, best_det, tid, track.confidence)
+            res = inference_worker.get_result(tid)
+
+            if not res:
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (80, 80, 80), 1)
+                cv2.putText(frame, "...", (x, y-8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (80, 80, 80), 1)
+                continue
+
+            matches = res["matches"]
+            if not matches or matches[0]["similarity"] < MULTI_SIM_THRESHOLD:
+                # Unrecognised — reset any pending confirmation for this track
+                _multi_tracks.pop(tid, None)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (60, 60, 200), 1)
+                cv2.putText(frame, "Unknown", (x, y-8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (60, 60, 200), 1)
+                continue
+
+            top_match   = matches[0]
+            student_id  = top_match["student_id"]
+            similarity  = top_match["similarity"]
+            accuracy_pct = max(0, min(100, int(similarity * 100)))
+
+            # Name lookup
+            if not hasattr(cam_stream, 'name_cache'):
+                cam_stream.name_cache = {}
+            def _lookup_multi(uid):
+                if uid not in cam_stream.name_cache:
+                    conn = db_manager.get_connection()
+                    cur  = conn.cursor()
+                    cur.execute("SELECT name FROM students WHERE id = ?", (uid,))
+                    row  = cur.fetchone()
+                    conn.close()
+                    cam_stream.name_cache[uid] = row["name"] if row else uid
+                return cam_stream.name_cache[uid]
+            student_name = _lookup_multi(student_id)
+
+            # Initialise or update tracking record
+            if tid not in _multi_tracks or _multi_tracks[tid]["student_id"] != student_id:
+                _multi_tracks[tid] = {
+                    "student_id":  student_id,
+                    "name":        student_name,
+                    "first_seen":  now,
+                    "marked":      False,
+                    "similarity":  similarity
+                }
+            else:
+                _multi_tracks[tid]["similarity"] = similarity
+
+            entry   = _multi_tracks[tid]
+            elapsed = now - entry["first_seen"]
+
+            if entry["marked"]:
+                # Already marked — show green with checkmark
+                cv2.rectangle(frame, (x, y), (x+w, y+h), GREEN_COLOR, 2)
+                cv2.putText(frame, f"✓ {student_name}  {accuracy_pct}%",
+                            (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, GREEN_COLOR, 2)
+                cv2.putText(frame, "PRESENT", (x, y+h+20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, GREEN_COLOR, 1)
+            else:
+                # Confirmation in progress — show cyan with progress bar
+                progress = min(1.0, elapsed / MULTI_CONFIRM_SEC)
+                bar_w    = int(w * progress)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 200, 200), 2)
+                cv2.putText(frame, f"{student_name}  {accuracy_pct}%",
+                            (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 200), 2)
+                # Progress bar along the bottom of the face box
+                cv2.rectangle(frame, (x, y+h+2), (x+w, y+h+8), (40, 40, 40), -1)
+                cv2.rectangle(frame, (x, y+h+2), (x+bar_w, y+h+8), (0, 200, 200), -1)
+
+                if elapsed >= MULTI_CONFIRM_SEC:
+                    # Confirmed — write to DB
+                    entry["marked"] = True
+                    import uuid
+                    from datetime import date
+                    try:
+                        conn = db_manager.get_connection()
+                        cur  = conn.cursor()
+                        event_id = str(uuid.uuid4())
+                        cur.execute('''
+                            INSERT INTO recognition_events
+                            (id, track_id, candidate_student_id, top1_similarity,
+                             margin, quality_score, liveness_score, decision)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (event_id, str(tid), student_id,
+                              float(similarity), 0.0,
+                              float(res["quality_eval"]["quality_score"]),
+                              float(res["liveness_score"]), "MATCH"))
+                        cur.execute('''
+                            INSERT OR IGNORE INTO attendance_records
+                            (id, student_id, recognition_event_id, attendance_date)
+                            VALUES (?, ?, ?, ?)
+                        ''', (str(uuid.uuid4()), student_id, event_id,
+                              date.today().isoformat()))
+                        conn.commit()
+                        conn.close()
+                        print(f"[Multi] Marked {student_name} present")
+                    except Exception as db_err:
+                        print(f"[Multi] DB error: {db_err}")
+
+    return frame
+
+# ── Endpoints ────────────────────────────────────────────────────────
+
+@app.route('/')
+def index():
+    return render_template('admin.html')
+
+@app.route('/register_page')
+def register_page():
+    return render_template('register.html')
+
+@app.route('/student')
+@app.route('/mark_page')
+def mark_page():
+    return render_template('student.html')
+
+@app.route('/multi')
+def multi_page():
+    return render_template('multi.html')
+
+@app.route('/video_feed')
+def video_feed():
+    def generate():
+        cam_stream.acquire()
+        try:
+            while True:
+                with cam_stream.lock:
+                    frame = cam_stream.latest_frame
+                    
+                if frame is None:
+                    time.sleep(0.05)
+                    continue
+                    
+                try:
+                    frame = process_frame(frame.copy())
+                except Exception as e:
+                    import traceback
+                    with open("crash_log.txt", "a") as f:
+                        f.write(traceback.format_exc() + "\n")
+                    # Return an error frame so the stream doesn't die immediately
+                    cv2.putText(frame, "SYSTEM CRASHED", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+                # ── Dynamic Zoom (display only) ─────────────────────────────
+                # Disable zoom when gaze dot is active so the dot is never clipped
+                _gaze_challenge_active = bool(_gaze_sessions)
+                frame = dynamic_zoom.apply(frame, _last_detections, _gaze_challenge_active)
+                    
+                ret, jpeg = cv2.imencode('.jpg', frame)
+                if ret:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+                time.sleep(0.03)
+        finally:
+            cam_stream.release()
+            
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/api/start_register', methods=['POST'])
+def start_register():
+    global current_mode, registration_parser, registration_student_id
+    data = request.json
+    name = data.get("name", "").strip()
+    admission_number = data.get("admission_number", "").strip() or None
+    
+    conn = db_manager.get_connection()
+    cursor = conn.cursor()
+    
+    # Do not look up by name. Use admission_number to identify re-registrations.
+    if admission_number:
+        cursor.execute("SELECT id FROM students WHERE admission_number = ?", (admission_number,))
+        row = cursor.fetchone()
+    else:
+        row = None
+        
+    if row:
+        registration_student_id = row['id']
+        # Do not delete old templates. Retire them for auditability.
+        cursor.execute("UPDATE biometric_templates SET template_status = 'RETIRED' WHERE student_id = ?", (registration_student_id,))
+        conn.commit()
+    else:
+        # Create DB entry
+        registration_student_id = db_manager.add_student(name, admission_number)
+    conn.close()
+    
+    registration_parser = VideoEnrollmentParser(quality_engine)
+    current_mode = "register"
+    
+    return jsonify({"success": True, "message": f"Started enrollment for {name}"})
+
+@app.route('/api/start_attendance', methods=['POST'])
+def start_attendance():
+    global current_mode
+    current_mode = "mark"
+    return jsonify({"success": True, "message": "Attendance scanning started"})
+
+@app.route('/api/stop_attendance', methods=['POST'])
+def stop_attendance():
+    global current_mode
+    current_mode = "idle"
+    # Clear all gaze sessions so next student starts fresh
+    _gaze_sessions.clear()
+    _gaze_results.clear()
+    attendance_engine.sessions.clear()
+    return jsonify({"success": True, "message": "Stopped scanning"})
+
+@app.route('/api/start_multi', methods=['POST'])
+def start_multi():
+    global current_mode
+    current_mode = "multi"
+    _multi_tracks.clear()
+    return jsonify({"success": True, "message": "Multi-student mode started"})
+
+@app.route('/api/stop_multi', methods=['POST'])
+def stop_multi():
+    global current_mode
+    current_mode = "idle"
+    _multi_tracks.clear()
+    return jsonify({"success": True, "message": "Multi-student mode stopped"})
+
+@app.route('/api/multi_status', methods=['GET'])
+def get_multi_status():
+    """Returns live list of all faces being tracked and their marking status."""
+    now = time.time()
+    students = []
+    for tid, entry in list(_multi_tracks.items()):
+        progress = 0 if entry["marked"] else min(100, int((now - entry["first_seen"]) / MULTI_CONFIRM_SEC * 100))
+        students.append({
+            "track_id":   tid,
+            "name":       entry["name"],
+            "accuracy":   max(0, min(100, int(entry["similarity"] * 100))),
+            "marked":     entry["marked"],
+            "progress":   100 if entry["marked"] else progress
+        })
+    return jsonify({"mode": current_mode, "students": students})
+
+@app.route('/api/delete_student', methods=['POST'])
+def delete_student():
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"success": False, "message": "Student name is required"}), 400
+        
+    conn = db_manager.get_connection()
+    cursor = conn.cursor()
+    
+    # Get student id
+    cursor.execute("SELECT id FROM students WHERE name = ?", (name,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"success": False, "message": f"Student '{name}' not found"}), 404
+        
+    student_id = row['id']
+    
+    # Delete templates, records, and student
+    cursor.execute("DELETE FROM biometric_templates WHERE student_id = ?", (student_id,))
+    cursor.execute("DELETE FROM attendance_records WHERE student_id = ?", (student_id,))
+    cursor.execute("DELETE FROM students WHERE id = ?", (student_id,))
+    conn.commit()
+    conn.close()
+    
+    # Reload vector engine gallery so the embeddings are removed from memory
+    vector_engine.reload_gallery()
+    
+    return jsonify({"success": True, "message": f"Deleted student '{name}' successfully"})
+
+@app.route('/api/mark_absent', methods=['POST'])
+def mark_absent():
+    from datetime import datetime
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"success": False, "message": "Student name is required"}), 400
+        
+    conn = db_manager.get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT id FROM students WHERE name = ?", (name,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"success": False, "message": f"Student '{name}' not found"}), 404
+        
+    student_id = row['id']
+    today = datetime.now().strftime("%Y-%m-%d")
+    
+    cursor.execute("DELETE FROM attendance_records WHERE student_id = ? AND attendance_date = ?", (student_id, today))
+    changes = conn.total_changes
+    conn.commit()
+    conn.close()
+    
+    if changes > 0:
+        return jsonify({"success": True, "message": f"Marked '{name}' as absent"})
+    else:
+        return jsonify({"success": False, "message": f"'{name}' was not marked present today"})
+
+@app.route('/api/students', methods=['GET'])
+def get_students():
+    conn = db_manager.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM students")
+    students = [row['name'] for row in cursor.fetchall()]
+    conn.close()
+    return jsonify(students)
+
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    # Format to match legacy UI structure: {"YYYY-MM-DD": ["Name1", "Name2"]}
+    conn = db_manager.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT a.attendance_date, s.name 
+        FROM attendance_records a 
+        JOIN students s ON a.student_id = s.id
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    
+    logs = {}
+    for row in rows:
+        d = row['attendance_date']
+        n = row['name']
+        if d not in logs:
+            logs[d] = []
+        if n not in logs[d]:
+            logs[d].append(n)
+            
+    return jsonify(logs)
+
+@app.route('/api/admin_stats', methods=['GET'])
+def get_admin_stats():
+    from datetime import datetime
+    conn = db_manager.get_connection()
+    cursor = conn.cursor()
+    
+    # Get all students
+    cursor.execute("SELECT name FROM students")
+    students = [row['name'] for row in cursor.fetchall()]
+    total_students = len(students)
+    
+    # Get today's attendance
+    today = datetime.now().strftime("%Y-%m-%d")
+    cursor.execute("""
+        SELECT s.name 
+        FROM attendance_records a 
+        JOIN students s ON a.student_id = s.id 
+        WHERE a.attendance_date = ?
+    """, (today,))
+    today_present = [row['name'] for row in cursor.fetchall()]
+    conn.close()
+    
+    today_absent = list(set(students) - set(today_present))
+    present_count = len(today_present)
+    absent_count = len(today_absent)
+    rate = (present_count / total_students * 100) if total_students > 0 else 0.0
+    
+    return jsonify({
+        "total_students": total_students,
+        "present_count": present_count,
+        "absent_count": absent_count,
+        "attendance_rate": rate,
+        "students": students,
+        "today_present": today_present,
+        "today_absent": today_absent,
+        "history": [] # Leaving history stubbed for brevity
+    })
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    step = "front"
+    if current_mode == "register" and registration_parser:
+        poses = set([c["pose_category"] for c in registration_parser.candidate_pool])
+        count = len(registration_parser.candidate_pool)
+        
+        if "FRONT" in poses and count > 10: step = "up"
+        if "UP" in poses and count > 20: step = "down"
+        if "DOWN" in poses and count >= 30: step = "done"
+    elif current_mode == "idle":
+        step = "done"
+        
+    return jsonify({
+        "state": current_mode,
+        "recognized": shared_status["student_name"],
+        "message": shared_status["message"],
+        "register_step": step
+    })
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

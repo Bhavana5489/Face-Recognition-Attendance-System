@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - GazePass</title>
+    <!-- Update cache buster to ensure new CSS loads -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=7">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="/admin" class="logo">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                GAZEPASS
+            </a>
+            <div class="nav-links">
+                <a href="/admin" class="nav-btn active">Dashboard</a>
+                <a href="/register_page" class="nav-btn">Register Student</a>
+                <a href="/multi" class="nav-btn" style="color: var(--primary);">Multi-Student Mode</a>
+                <a href="/student" class="nav-btn" style="color: var(--success);">Switch to Student Mode</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <a href="#" class="nav-item active" onclick="switchTab('analytics')">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    <span>Dashboard</span>
+                </div>
+            </a>
+            <a href="#" class="nav-item" onclick="switchTab('students')">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    <span>Student Roster</span>
+                </div>
+                <span id="tabStudentCnt" style="margin-left: auto;">0</span>
+            </a>
+            <a href="#" class="nav-item" onclick="switchTab('presents')">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>Presents Today</span>
+                </div>
+                <span id="tabPresentCnt" style="margin-left: auto;">0</span>
+            </a>
+            <a href="#" class="nav-item" onclick="switchTab('absentees')">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                    <span>Absentees</span>
+                </div>
+                <span id="tabAbsentCnt" style="margin-left: auto;">0</span>
+            </a>
+        </aside>
+
+        <main class="admin-main">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;" class="animate-fade-up">
+                <div>
+                    <h1 style="margin-bottom: 0.2rem;">Administrator Control Center</h1>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">
+                        Manage student database, monitor real-time presents/absentees, and inspect analytics.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 0.8rem; flex-wrap: wrap;">
+                    <a href="/register_page" class="btn btn-primary">
+                        Register Student
+                    </a>
+                    <a href="/api/export_logs" class="btn btn-secondary">
+                        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Export CSV
+                    </a>
+                </div>
+            </div>
+
+            <div class="stats-bar animate-fade-up delay-1">
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div>
+                        <div class="stat-num" id="totalStudents">0</div>
+                        <div class="stat-lbl">Registered Students</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--success-bg); color: var(--success);">
+                        <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
+                    <div>
+                        <div class="stat-num" id="todayPresent">0</div>
+                        <div class="stat-lbl">Presents Today</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--danger-bg); color: var(--danger);">
+                        <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </div>
+                    <div>
+                        <div class="stat-num" id="todayAbsent">0</div>
+                        <div class="stat-lbl">Absentees Today</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📈</div>
+                    <div>
+                        <div class="stat-num" id="attendanceRate">0%</div>
+                        <div class="stat-lbl">Attendance Rate</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 1: Analytics -->
+            <div id="tab-analytics" class="tab-content active animate-fade-up delay-2">
+                <div class="grid-2">
+                    <div class="card">
+                        <h2>7-Day Attendance Trend</h2>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                            Daily present vs absent counts over the past week.
+                        </p>
+                        <div class="chart-container">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Today's Ratio</h2>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+                            Breakdown of Present vs Absent registered students today.
+                        </p>
+                        <div class="chart-container" style="display: flex; justify-content: center; align-items: center;">
+                            <canvas id="pieChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Registered Students -->
+            <div id="tab-students" class="tab-content">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1.2rem;">
+                        <div>
+                            <h2>Registered Students Directory</h2>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                                All facial profiles currently enrolled in the dataset.
+                            </p>
+                        </div>
+                        <input type="text" id="searchStudents" class="input-glow" placeholder="Search student name..." style="max-width: 100%; width: 280px;" onkeyup="filterStudentList()">
+                    </div>
+
+                    <div class="registry-list" id="registeredStudentsList">
+                        <p style="color: var(--text-muted);">Loading students...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Today's Presents -->
+            <div id="tab-presents" class="tab-content">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+                        <div>
+                            <h2 style="color: var(--success);">Today's Present Students</h2>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                                Students who successfully verified identity & liveness.
+                            </p>
+                        </div>
+                        <span class="badge badge-success" id="presentBadgeCnt">0 Verified</span>
+                    </div>
+
+                    <div class="log-list" id="presentsList">
+                        <p style="color: var(--text-muted);">Loading present list...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: Today's Absentees -->
+            <div id="tab-absentees" class="tab-content">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+                        <div>
+                            <h2 style="color: var(--danger);">Today's Absent Students</h2>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                                Registered students who have not marked attendance today.
+                            </p>
+                        </div>
+                        <span class="badge badge-danger" id="absentBadgeCnt">0 Pending</span>
+                    </div>
+
+                    <div class="log-list" id="absenteesList">
+                        <p style="color: var(--text-muted);">Loading absentees list...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        let adminStats = null;
+        let trendChartInstance = null;
+        let pieChartInstance = null;
+
+        function showToast(msg, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <svg class="icon" viewBox="0 0 24 24">
+                    ${type === 'success' ? '<polyline points="20 6 9 17 4 12"></polyline>' : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>'}
+                </svg>
+                <div>${msg}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        async function fetchAdminStats() {
+            try {
+                const res = await fetch('/api/admin_stats');
+                adminStats = await res.json();
+
+                // Update Metrics
+                document.getElementById('totalStudents').innerText = adminStats.total_students;
+                document.getElementById('todayPresent').innerText = adminStats.present_count;
+                document.getElementById('todayAbsent').innerText = adminStats.absent_count;
+                document.getElementById('attendanceRate').innerText = `${adminStats.attendance_rate}%`;
+
+                document.getElementById('tabStudentCnt').innerText = adminStats.total_students;
+                document.getElementById('tabPresentCnt').innerText = adminStats.present_count;
+                document.getElementById('tabAbsentCnt').innerText = adminStats.absent_count;
+
+                document.getElementById('presentBadgeCnt').innerText = `${adminStats.present_count} Verified`;
+                document.getElementById('absentBadgeCnt').innerText = `${adminStats.absent_count} Pending`;
+
+                // Render Charts
+                renderTrendChart(adminStats.history);
+                renderPieChart(adminStats.present_count, adminStats.absent_count);
+
+                // Render Lists
+                renderRegisteredStudents(adminStats.students, adminStats.today_present);
+                renderPresentsList(adminStats.today_present);
+                renderAbsenteesList(adminStats.today_absent);
+            } catch (err) {
+                console.error("Failed to load admin stats:", err);
+            }
+        }
+
+        function renderTrendChart(historyData) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            const labels = historyData.map(h => h.label);
+            const presentData = historyData.map(h => h.present);
+            const absentData = historyData.map(h => h.absent);
+
+            if (trendChartInstance) trendChartInstance.destroy();
+
+            trendChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Present',
+                            data: presentData,
+                            borderColor: '#059669',
+                            backgroundColor: 'rgba(5, 150, 105, 0.15)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Absent',
+                            data: absentData,
+                            borderColor: '#DC2626',
+                            backgroundColor: 'rgba(220, 38, 38, 0.08)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#64748B', font: {family: "'Inter', sans-serif"} } } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#E2E8F0' }, ticks: { color: '#64748B', stepSize: 1 } },
+                        x: { grid: { display: false }, ticks: { color: '#64748B' } }
+                    }
+                }
+            });
+        }
+
+        function renderPieChart(presentCnt, absentCnt) {
+            const ctx = document.getElementById('pieChart').getContext('2d');
+            if (pieChartInstance) pieChartInstance.destroy();
+
+            if (presentCnt === 0 && absentCnt === 0) {
+                ctx.clearRect(0, 0, 250, 250);
+                return;
+            }
+
+            pieChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Present Today', 'Absent Today'],
+                    datasets: [{
+                        data: [presentCnt, absentCnt],
+                        backgroundColor: ['#059669', '#DC2626'],
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#64748B', padding: 16, font: {family: "'Inter', sans-serif"} } }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        function renderRegisteredStudents(students, presents) {
+            const container = document.getElementById('registeredStudentsList');
+            if (!students || students.length === 0) {
+                container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No students registered yet. Click "Register Student" to get started.</p>`;
+                return;
+            }
+
+            const presentSet = new Set(presents);
+            container.innerHTML = students.map(st => {
+                const isPresent = presentSet.has(st);
+                const displayName = st.replace(/_/g, ' ');
+                return `
+                    <div class="list-item student-row" data-name="${st.toLowerCase()}">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--bg-base); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--primary);">
+                                ${displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div class="student-name">${displayName}</div>
+                                <div class="student-meta data-text">Enrolled in Dataset</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span class="badge ${isPresent ? 'badge-success' : 'badge-danger'}">
+                                ${isPresent ? 'Present' : 'Absent'}
+                            </span>
+                            <button class="btn btn-danger btn-sm" onclick="confirmDeleteStudent('${st}')" title="Delete Profile">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPresentsList(presents) {
+            const container = document.getElementById('presentsList');
+            if (!presents || presents.length === 0) {
+                container.innerHTML = `<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No students have marked attendance today yet.</p>`;
+                return;
+            }
+
+            container.innerHTML = presents.map(st => `
+                <div class="list-item">
+                    <div style="display: flex; align-items: center; gap: 0.8rem;">
+                        <svg class="icon" style="color: var(--success);" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        <div>
+                            <div class="student-name">${st.replace(/_/g, ' ')}</div>
+                            <div class="student-meta data-text">Verified via Liveness Check</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span class="badge badge-success">Present</span>
+                        <button class="btn btn-secondary btn-sm" onclick="markAbsent('${st}')" title="Mark Absent">Mark Absent</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderAbsenteesList(absentees) {
+            const container = document.getElementById('absenteesList');
+            if (!absentees || absentees.length === 0) {
+                container.innerHTML = `<p style="color: var(--success); text-align: center; padding: 2rem;">100% Attendance Today! No absentees.</p>`;
+                return;
+            }
+
+            container.innerHTML = absentees.map(st => `
+                <div class="list-item">
+                    <div style="display: flex; align-items: center; gap: 0.8rem;">
+                        <svg class="icon" style="color: var(--danger);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                        <div>
+                            <div class="student-name">${st.replace(/_/g, ' ')}</div>
+                            <div class="student-meta data-text">Pending Attendance Check</div>
+                        </div>
+                    </div>
+                    <span class="badge badge-danger">Absent</span>
+                </div>
+            `).join('');
+        }
+
+        function filterStudentList() {
+            const q = document.getElementById('searchStudents').value.toLowerCase();
+            document.querySelectorAll('.student-row').forEach(row => {
+                const name = row.getAttribute('data-name');
+                row.style.display = name.includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        async function confirmDeleteStudent(name) {
+            if (confirm(`Are you sure you want to delete student '${name.replace(/_/g, ' ')}'?`)) {
+                try {
+                    const res = await fetch('/api/delete_student', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        fetchAdminStats();
+                    } else {
+                        showToast(data.message, 'error');
+                    }
+                } catch (err) {
+                    showToast('Failed to delete student', 'error');
+                }
+            }
+        }
+
+        async function markAbsent(name) {
+            if (confirm(`Are you sure you want to mark '${name.replace(/_/g, ' ')}' as absent?`)) {
+                try {
+                    const res = await fetch('/api/mark_absent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        fetchAdminStats();
+                    } else {
+                        showToast(data.message, 'error');
+                    }
+                } catch (err) {
+                    showToast('Failed to mark absent', 'error');
+                }
+            }
+        }
+
+        // Initialize & set auto refresh interval
+        fetchAdminStats();
+        setInterval(fetchAdminStats, 10000);
+    </script>
+</body>
+</html>

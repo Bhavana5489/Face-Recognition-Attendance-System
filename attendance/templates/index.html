@@ -3,205 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gaze-Tracking Attendance Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>GazePass - Smart Attendance Portal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=8">
 </head>
 <body>
-
     <header>
         <div class="nav-container">
             <a href="/" class="logo">
-                <i class="fas fa-eye"></i> GAZEPASS
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                GAZEPASS
             </a>
             <div class="nav-links">
-                <a href="/" class="nav-btn active">Dashboard</a>
-                <a href="/register_page" class="nav-btn">Register Student</a>
-                <a href="/mark_page" class="nav-btn">Mark Attendance</a>
+                <a href="/admin" class="nav-btn">Admin Portal</a>
+                <a href="/student" class="nav-btn">Student Portal</a>
             </div>
         </div>
     </header>
 
-    <main>
-        <!-- Stats Banner -->
-        <div class="stats-bar animate-fade-up">
-            <div class="stat-card">
-                <div class="stat-icon">👤</div>
-                <div>
-                    <div class="stat-num" id="totalStudents">0</div>
-                    <div class="stat-lbl">Registered Students</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">✔️</div>
-                <div>
-                    <div class="stat-num" id="todayPresent">0</div>
-                    <div class="stat-lbl">Today Present</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">📈</div>
-                <div>
-                    <div class="stat-num" id="attendanceRate">0%</div>
-                    <div class="stat-lbl">Attendance Rate</div>
-                </div>
-            </div>
+    <main style="max-width: 1000px; padding-top: 2rem;">
+        <div class="animate-fade-up" style="text-align: center; margin-bottom: 3rem;">
+            <span class="badge badge-info" style="font-size: 0.9rem; margin-bottom: 1rem;">
+                Institutional Biometric System
+            </span>
+            <h1 style="font-size: 2.5rem; line-height: 1.2; margin-bottom: 1rem;">
+                Welcome to GazePass
+            </h1>
+            <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 640px; margin: 0 auto;">
+                Select your portal below to access administrator management tools or mark student attendance using liveness & gaze verification.
+            </p>
         </div>
 
-        <div class="grid-3">
-            <!-- Left Panel: Navigation Actions -->
-            <div class="glass-card animate-fade-up delay-1">
-                <h2 class="title-glow">Actions</h2>
-                <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">
-                    Perform student registration or launch the live verification system.
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin-top: 2rem;" class="animate-fade-up delay-1">
+            <!-- Admin Dashboard Card -->
+            <div class="card" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 1.2rem; width: 80px; height: 80px; border-radius: 50%; background: var(--bg-base); display: flex; align-items: center; justify-content: center; border: 1px solid var(--border);">
+                    <svg class="icon" style="width: 40px; height: 40px; color: var(--primary);" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                </div>
+                <h2 style="font-size: 1.5rem; margin-bottom: 0.8rem;">Admin Dashboard</h2>
+                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.8rem; flex-grow: 1;">
+                    Register new students, view registered student directory, track presents & absentees, inspect analytics, and export CSV logs.
                 </p>
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <a href="/register_page" class="btn btn-primary">
-                        ➕ Register Student
-                    </a>
-                    <a href="/mark_page" class="btn btn-secondary" style="border-color: var(--primary);">
-                        🎯 Start Attendance Marking
-                    </a>
-                </div>
+                <a href="/admin" class="btn btn-secondary" style="width: 100%;">
+                    Access Admin Portal
+                </a>
             </div>
 
-            <!-- Middle Panel: Analytics -->
-            <div class="glass-card animate-fade-up delay-2">
-                <h2>Attendance Analytics</h2>
-                <div class="chart-container">
-                    <canvas id="attendanceChart"></canvas>
+            <!-- Student Portal Card -->
+            <div class="card" style="display: flex; flex-direction: column; align-items: center; text-align: center; border-color: rgba(5, 150, 105, 0.3);">
+                <div style="font-size: 3rem; margin-bottom: 1.2rem; width: 80px; height: 80px; border-radius: 50%; background: var(--success-bg); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(5, 150, 105, 0.2);">
+                    <svg class="icon" style="width: 40px; height: 40px; color: var(--success);" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
                 </div>
-            </div>
-
-            <!-- Right Panel: Today's Logs -->
-            <div class="glass-card animate-fade-up delay-3">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h2 style="margin: 0;">Today's Logs</h2>
-                    <a href="/api/export_logs" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">📥 Export CSV</a>
-                </div>
-                <div class="log-list" id="logList">
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">Loading log entries...</p>
-                </div>
+                <h2 style="font-size: 1.5rem; margin-bottom: 0.8rem;">Student Portal</h2>
+                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.8rem; flex-grow: 1;">
+                    Dedicated, distraction-free attendance marking interface with live webcam face recognition and gaze verification.
+                </p>
+                <a href="/student" class="btn btn-primary" style="width: 100%; background: var(--success);">
+                    Mark Attendance Now
+                </a>
             </div>
         </div>
     </main>
-
-    <script>
-        async function loadDashboardData() {
-            try {
-                // Fetch Students
-                const resStudents = await fetch('/api/students');
-                const students = await resStudents.json();
-                
-                // Fetch Logs
-                const resLogs = await fetch('/api/logs');
-                const logs = await resLogs.json();
-                
-                const today = new Date().toISOString().split('T')[0];
-                let todayLogsObj = logs[today] || {};
-                let todayLogs = [];
-                // Support both flat array and nested subjects
-                if (Array.isArray(todayLogsObj)) {
-                    todayLogs = todayLogsObj.map(name => ({name, subject: 'General'}));
-                } else {
-                    for (const [subject, studentsList] of Object.entries(todayLogsObj)) {
-                        studentsList.forEach(name => todayLogs.push({name, subject}));
-                    }
-                }
-                
-                // Update stats (Count unique students)
-                const uniqueStudents = new Set(todayLogs.map(log => log.name)).size;
-                document.getElementById('totalStudents').innerText = students.length;
-                document.getElementById('todayPresent').innerText = uniqueStudents;
-                
-                const rate = students.length > 0 ? Math.round((uniqueStudents / students.length) * 100) : 0;
-                document.getElementById('attendanceRate').innerText = `${rate}%`;
-                
-                // Update Student list
-                const studentList = document.getElementById('studentList');
-                if (students.length === 0) {
-                    studentList.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">No students registered yet.</p>';
-                } else {
-                    studentList.innerHTML = students.map(name => `
-                        <div class="list-item">
-                            <div>
-                                <div class="student-name">${name.replace('_', ' ')}</div>
-                                <div class="student-meta">Profile Active</div>
-                            </div>
-                            <span class="badge badge-info">Registered</span>
-                        </div>
-                    `).join('');
-                }
-                
-                
-                // --- Chart.js Rendering ---
-                const ctx = document.getElementById('attendanceChart').getContext('2d');
-                
-                // Get last 7 days keys
-                const last7Days = [];
-                for(let i=6; i>=0; i--) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - i);
-                    last7Days.push(d.toISOString().split('T')[0]);
-                }
-                
-                const attendanceCounts = last7Days.map(date => {
-                    const lObj = logs[date] || [];
-                    return Array.isArray(lObj) ? lObj.length : Object.keys(lObj).length; // Handle both arrays and dicts (safe fallback)
-                });
-                
-                if(window.myChart) window.myChart.destroy();
-                
-                window.myChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: last7Days.map(d => d.slice(5)), // MM-DD
-                        datasets: [{
-                            label: 'Present Students',
-                            data: attendanceCounts,
-                            borderColor: '#00f2fe',
-                            backgroundColor: 'rgba(0, 242, 254, 0.2)',
-                            borderWidth: 2,
-                            borderRadius: 4,
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', stepSize: 1 } },
-                            x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                        }
-                    }
-                });
-                // Update Logs list
-                const logList = document.getElementById('logList');
-                if (todayLogs.length === 0) {
-                    logList.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9rem;">No attendance marked today.</p>';
-                } else {
-                    logList.innerHTML = todayLogs.map((log, idx) => `
-                        <div class="list-item">
-                            <div>
-                                <div class="student-name">${log.name.replace('_', ' ')}</div>
-                                <div class="student-meta">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                            </div>
-                            <span class="badge badge-success">Present</span>
-                        </div>
-                    `).join('');
-                }
-            } catch (err) {
-                console.error("Error loading dashboard data:", err);
-            }
-        }
-
-        // Load initially
-        loadDashboardData();
-        // Reload every 10 seconds to keep live dashboard fresh
-        setInterval(loadDashboardData, 10000);
-    </script>
 </body>
 </html>
