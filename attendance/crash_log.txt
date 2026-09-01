@@ -498,3 +498,105 @@ Traceback (most recent call last):
                 ^^^^^^^^^^^
 NameError: name 'GREEN_COLOR' is not defined
 
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 535, in process_frame
+    done = session.update(frame, track.bbox, yunet_lm)
+  File "D:\projects\face_detection\attendance\server.py", line 365, in update
+    r = _get_pupil_x_ratio_average(frame, face_bbox, yunet_landmarks)
+  File "D:\projects\face_detection\attendance\server.py", line 313, in _get_pupil_x_ratio_average
+    eyes = eye_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv_contrib\modules\xobjdetect\src\cascadedetect.cpp:1689: error: (-215:Assertion failed) !empty() in function 'cv::CascadeClassifier::detectMultiScale'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 535, in process_frame
+    done = session.update(frame, track.bbox, yunet_lm)
+  File "D:\projects\face_detection\attendance\server.py", line 365, in update
+    r = _get_pupil_x_ratio_average(frame, face_bbox, yunet_landmarks)
+  File "D:\projects\face_detection\attendance\server.py", line 313, in _get_pupil_x_ratio_average
+    eyes = eye_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv_contrib\modules\xobjdetect\src\cascadedetect.cpp:1689: error: (-215:Assertion failed) !empty() in function 'cv::CascadeClassifier::detectMultiScale'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 535, in process_frame
+    done = session.update(frame, track.bbox, yunet_lm)
+  File "D:\projects\face_detection\attendance\server.py", line 365, in update
+    r = _get_pupil_x_ratio_average(frame, face_bbox, yunet_landmarks)
+  File "D:\projects\face_detection\attendance\server.py", line 313, in _get_pupil_x_ratio_average
+    eyes = eye_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=8, minSize=(20, 20))
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv_contrib\modules\xobjdetect\src\cascadedetect.cpp:1689: error: (-215:Assertion failed) !empty() in function 'cv::CascadeClassifier::detectMultiScale'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 419, in process_frame
+    detections = detector.detect(frame)
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 61, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 419, in process_frame
+    detections = detector.detect(frame)
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 61, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 419, in process_frame
+    detections = detector.detect(frame)
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 61, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 419, in process_frame
+    detections = detector.detect(frame)
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 61, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 419, in process_frame
+    detections = detector.detect(frame)
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 61, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+
+Traceback (most recent call last):
+  File "D:\projects\face_detection\attendance\server.py", line 778, in generate
+    frame = process_frame(frame.copy())
+  File "D:\projects\face_detection\attendance\server.py", line 419, in process_frame
+    detections = detector.detect(frame)
+  File "D:\projects\face_detection\gazepass\app\vision\detector\yunet.py", line 61, in detect
+    _, faces = self.detector.detect(frame)
+               ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+cv2.error: OpenCV(5.0.0) D:\a\opencv-python\opencv-python\opencv\modules\dnn\src\net_impl2.cpp:1323: error: (-215:Assertion failed) buf.shape() == m.shape() in function 'cv::dnn::dnn5_v20260605::Net::Impl::forwardGraph'
+
+

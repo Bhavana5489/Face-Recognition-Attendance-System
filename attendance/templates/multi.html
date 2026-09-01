@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Student Attendance — GazePass</title>
+    <!-- Update cache buster to ensure new CSS loads -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=7">
+</head>
+<body style="overflow: hidden;">
+    <header>
+        <div class="nav-container">
+            <a href="/admin" class="logo">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                GAZEPASS | Multi-Student
+            </a>
+            <div class="nav-links">
+                <a href="/admin" class="nav-btn">Back to Dashboard</a>
+            </div>
+        </div>
+    </header>
+
+    <div class="multi-layout">
+        <!-- LEFT: Camera -->
+        <div class="multi-camera">
+            <img id="videoFeed" src="/video_feed" alt="Live Camera Feed">
+            <div class="cam-overlay">
+                <div class="top-bar">
+                    <span class="mode-badge" id="modeBadge" style="background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border);">● IDLE</span>
+                </div>
+                <div class="top-bar" style="top: auto; bottom: 0; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);">
+                    <p style="color: rgba(255,255,255,0.8); font-size: 0.9rem; margin: 0;">Point camera at a group. All registered faces will be auto-marked.</p>
+                    <span id="liveCount" style="color: #fff; font-weight: 600; font-size: 1rem;">0 detected</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Sidebar -->
+        <div class="multi-queue">
+            <div class="queue-header">
+                <h2 style="margin-bottom: 0.25rem;">Live Attendance</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Auto-marks faces after 2s of recognition.</p>
+            </div>
+
+            <div class="ctrl-row">
+                <button id="startBtn" class="btn btn-primary" onclick="startSession()">▶ Start</button>
+                <button id="stopBtn"  class="btn btn-secondary" onclick="stopSession()" disabled>⏹ Stop</button>
+                <button id="clearBtn" class="btn btn-outline" onclick="clearList()" title="Clear sidebar list" style="flex: 0 0 auto;">
+                    <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+
+            <div class="session-stats">
+                <div>
+                    <div class="sess-stat-num" id="statDetected" style="color: var(--primary);">0</div>
+                    <div class="sess-stat-lbl">Detected</div>
+                </div>
+                <div>
+                    <div class="sess-stat-num" id="statMarked" style="color: var(--success);">0</div>
+                    <div class="sess-stat-lbl">Marked</div>
+                </div>
+                <div>
+                    <div class="sess-stat-num" id="statPending" style="color: var(--warning);">0</div>
+                    <div class="sess-stat-lbl">Pending</div>
+                </div>
+            </div>
+
+            <div class="student-list" id="studentList">
+                <div class="empty-state" id="emptyState">
+                    <svg class="icon" style="width: 48px; height: 48px; margin-bottom: 1rem; color: var(--border);" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <p>Press <strong>Start</strong> and point the camera at the class.<br>Faces will appear here as they're recognised.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        let pollInterval = null;
+        let sessionActive = false;
+        let seenStudents = {}; 
+
+        function showToast(msg, type = 'success') {
+            const c = document.getElementById('toastContainer');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `
+                <svg class="icon" viewBox="0 0 24 24">
+                    ${type === 'success' ? '<polyline points="20 6 9 17 4 12"></polyline>' : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>'}
+                </svg>
+                <div>${msg}</div>`;
+            c.appendChild(t);
+            setTimeout(() => t.classList.add('show'), 10);
+            setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+        }
+
+        async function startSession() {
+            await fetch('/api/start_multi', { method: 'POST' });
+            sessionActive = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled  = false;
+            document.getElementById('modeBadge').textContent = '● LIVE';
+            document.getElementById('modeBadge').style.background = '#E0F2FE';
+            document.getElementById('modeBadge').style.color = 'var(--primary)';
+            document.getElementById('modeBadge').style.borderColor = 'var(--primary)';
+            pollInterval = setInterval(pollStatus, 600);
+            showToast('Multi-student session started', 'success');
+        }
+
+        async function stopSession() {
+            await fetch('/api/stop_multi', { method: 'POST' });
+            sessionActive = false;
+            clearInterval(pollInterval);
+            pollInterval = null;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled  = true;
+            document.getElementById('modeBadge').textContent = '● IDLE';
+            document.getElementById('modeBadge').style.background = 'var(--bg-surface)';
+            document.getElementById('modeBadge').style.color = 'var(--text-main)';
+            document.getElementById('modeBadge').style.borderColor = 'var(--border)';
+            showToast('Session stopped', 'success');
+        }
+
+        function clearList() {
+            seenStudents = {};
+            renderList();
+        }
+
+        async function pollStatus() {
+            try {
+                const res  = await fetch('/api/multi_status');
+                const data = await res.json();
+                const students = data.students || [];
+
+                students.forEach(s => {
+                    const key = s.name;
+                    const wasMarked = seenStudents[key]?.marked;
+                    seenStudents[key] = s;
+                    if (!wasMarked && s.marked) {
+                        showToast(`Attendance marked: ${s.name.replace(/_/g,' ')}`, 'success');
+                    }
+                });
+
+                renderList();
+
+                const all     = Object.values(seenStudents);
+                const marked  = all.filter(s => s.marked).length;
+                const pending = all.filter(s => !s.marked).length;
+                document.getElementById('statDetected').textContent = students.length;
+                document.getElementById('statMarked').textContent   = marked;
+                document.getElementById('statPending').textContent  = pending;
+                document.getElementById('liveCount').textContent    = `${students.length} detected`;
+            } catch(e) { }
+        }
+
+        function renderList() {
+            const list   = document.getElementById('studentList');
+            const empty  = document.getElementById('emptyState');
+            const all    = Object.values(seenStudents);
+
+            if (all.length === 0) {
+                empty.style.display = 'flex';
+                list.querySelectorAll('.student-card').forEach(c => c.remove());
+                return;
+            }
+            empty.style.display = 'none';
+
+            all.sort((a, b) => (b.marked - a.marked) || a.name.localeCompare(b.name));
+
+            const newIds = new Set(all.map(s => s.name));
+
+            list.querySelectorAll('.student-card').forEach(c => {
+                if (!newIds.has(c.dataset.name)) c.remove();
+            });
+
+            all.forEach(student => {
+                const displayName = student.name.replace(/_/g, ' ');
+                let card = list.querySelector(`.student-card[data-name="${student.name}"]`);
+
+                if (!card) {
+                    card = document.createElement('div');
+                    card.className = 'student-card';
+                    card.dataset.name = student.name;
+                    card.innerHTML = `
+                        <div style="width: 100%;">
+                            <div class="card-top">
+                                <span class="card-name">${displayName}</span>
+                                <span class="card-accuracy data-text" id="acc-${student.name}"></span>
+                            </div>
+                            <div class="card-status">
+                                <span class="status-label" id="lbl-${student.name}"></span>
+                            </div>
+                            <div class="progress-bar-bg" style="margin-top: 0.5rem; height: 4px;">
+                                <div class="progress-bar-fill" id="bar-${student.name}" style="width:0%"></div>
+                            </div>
+                        </div>
+                    `;
+                    const firstPending = list.querySelector('.student-card.pending');
+                    if (student.marked || !firstPending) {
+                        list.prepend(card);
+                    } else {
+                        list.insertBefore(card, firstPending);
+                    }
+                }
+
+                card.className = `student-card ${student.marked ? 'marked' : 'pending'}`;
+                const accEl = document.getElementById(`acc-${student.name}`);
+                const lblEl = document.getElementById(`lbl-${student.name}`);
+                const barEl = document.getElementById(`bar-${student.name}`);
+
+                if (accEl) accEl.textContent = `${student.accuracy}% match`;
+                if (lblEl) {
+                    lblEl.className = `status-label ${student.marked ? 'marked' : 'pending'}`;
+                    lblEl.innerHTML = student.marked ? 
+                        '<svg class="icon" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg> Present — Marked' : 
+                        `Confirming… ${student.progress}%`;
+                }
+                if (barEl) {
+                    barEl.style.width = `${student.progress}%`;
+                    barEl.style.background = student.marked ? 'var(--success)' : 'var(--primary)';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -3,79 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Student Attendance Terminal - GazePass</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=8">
+    <title>Student Check-in - GazePass</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=7">
 </head>
 <body class="student-body">
-
-    <!-- Minimal Student Header -->
-    <header class="student-header">
+    <header>
         <div class="nav-container">
             <a href="/student" class="logo">
-                🎓 GAZEPASS <span class="logo-tag">| Terminal</span>
+                <svg class="icon" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+                GAZEPASS | Terminal
             </a>
-            <a href="/" class="nav-btn">🏠 Home</a>
+            <div class="nav-links">
+                <a href="/" class="nav-btn">Back to Home</a>
+            </div>
         </div>
     </header>
 
-    <main class="student-main-container">
-        <!-- Page Title Banner -->
-        <div class="student-hero animate-fade-up">
-            <h1>Student Attendance Terminal</h1>
-            <p>Look into the camera frame and follow the target dot to verify identity.</p>
+    <div class="student-layout">
+        <div class="camera-container" id="student-camera">
+            <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Live Attendance Feed">
+            <div class="face-guide"></div>
+            <!-- The gaze dot is injected dynamically, but the server handles overlaying it on the stream directly in this implementation, 
+                 so we don't strictly need a CSS dot here unless we want client-side visuals. The backend draws it. -->
         </div>
-
-        <!-- Main Responsive Layout Grid (80% Camera / 20% Details on Desktop, Stacked 100% on Mobile) -->
-        <div class="student-terminal-grid animate-fade-up delay-1">
+        
+        <div class="feedback-drawer state-idle" id="student-drawer">
+            <div class="state-icon" id="drawer-icon">
+                <svg viewBox="0 0 24 24" class="icon"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            </div>
+            <div>
+                <div class="feedback-title" id="drawer-title">Ready</div>
+                <div class="feedback-desc" id="statusBadge">Please step in front of the camera.</div>
+            </div>
             
-            <!-- CAMERA FEED SECTION (Top on mobile 100% width, Left 80% on desktop) -->
-            <div class="camera-feed-section">
-                <div class="video-wrapper">
-                    <div class="video-overlay-scanline"></div>
-                    <img src="{{ url_for('video_feed') }}" id="streamImg" alt="Live Attendance Feed">
+            <div style="width: 100%; text-align: left; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-muted); font-size: 0.85rem;">Student:</span>
+                    <strong style="color: var(--text-main);" id="profileName">Searching...</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: var(--text-muted); font-size: 0.85rem;">Gaze:</span>
+                    <strong style="color: var(--text-main);" id="gazeDir">N/A</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                    <span style="color: var(--text-muted); font-size: 0.85rem;">Challenge Progress:</span>
+                    <span style="font-size: 0.85rem; font-weight: 500;" id="progressText">0 / 2</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progressBar" class="progress-bar-fill"></div>
                 </div>
             </div>
 
-            <!-- DETAILS HUD PANEL (Below on mobile 100% width, Right 20% on desktop) -->
-            <div class="hud-details-section">
-                <div class="glass-card hud-card">
-                    
-                    <div class="hud-group">
-                        <span class="hud-label">SYSTEM STATUS</span>
-                        <div class="hud-badge-wrapper">
-                            <span class="badge badge-info" id="statusBadge">Initializing Camera...</span>
-                        </div>
-                    </div>
-
-                    <div class="hud-group hud-divider">
-                        <span class="hud-label">RECOGNIZED STUDENT</span>
-                        <strong class="hud-value-white" id="profileName">Searching...</strong>
-                    </div>
-
-                    <div class="hud-group hud-divider">
-                        <span class="hud-label">GAZE DIRECTION</span>
-                        <strong class="hud-value-primary" id="gazeDir">N/A</strong>
-                    </div>
-
-                    <div class="hud-group hud-divider" id="gazeProgressCard">
-                        <div class="progress-header">
-                            <span class="progress-title">Gaze Liveness</span>
-                            <span class="progress-count" id="progressText">0 / 2</span>
-                        </div>
-                        <div class="progress-bar-bg">
-                            <div id="progressBar" class="progress-bar-fill"></div>
-                        </div>
-                    </div>
-
-                </div>
-
-                <button class="btn btn-secondary reset-btn" onclick="resetStudentPortal()">
-                    🔄 Reset / Next Student
-                </button>
-            </div>
-
+            <button class="btn btn-secondary" onclick="resetStudentPortal()" style="width: 100%; margin-top: 1rem;">
+                Reset / Next Student
+            </button>
         </div>
-    </main>
+    </div>
 
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
@@ -84,6 +67,29 @@
         let pollInterval = null;
         let toastShown = false;
         let audioPlayed = false;
+
+        const stateIcons = {
+            'idle': '<svg viewBox="0 0 24 24" class="icon"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>',
+            'scanning': '<svg viewBox="0 0 24 24" class="icon"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+            'success': '<svg viewBox="0 0 24 24" class="icon"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+            'error': '<svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>'
+        };
+
+        function setUIState(stateName, title, desc) {
+            const drawer = document.getElementById('student-drawer');
+            const camera = document.getElementById('student-camera');
+            
+            drawer.className = 'feedback-drawer state-' + stateName;
+            if(stateName === 'scanning') {
+                camera.classList.add('camera-state-scanning');
+            } else {
+                camera.classList.remove('camera-state-scanning');
+            }
+            
+            document.getElementById('drawer-icon').innerHTML = stateIcons[stateName];
+            document.getElementById('drawer-title').innerText = title;
+            document.getElementById('statusBadge').innerText = desc;
+        }
 
         function playSuccessSound() {
             try {
@@ -107,7 +113,11 @@
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            toast.innerHTML = `<span>${type==='success'?'✅':'⚠️'}</span> <div>${msg}</div>`;
+            toast.innerHTML = `
+                <svg class="icon" viewBox="0 0 24 24">
+                    ${type === 'success' ? '<polyline points="20 6 9 17 4 12"></polyline>' : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>'}
+                </svg>
+                <div>${msg}</div>`;
             container.appendChild(toast);
             setTimeout(() => toast.classList.add('show'), 10);
             setTimeout(() => {
@@ -123,6 +133,7 @@
                 await fetch('/api/start_attendance', { method: 'POST' });
                 if (pollInterval) clearInterval(pollInterval);
                 pollInterval = setInterval(pollStatus, 300);
+                setUIState('idle', 'Ready', 'Please step in front of the camera.');
             } catch (err) {
                 console.error("Error starting attendance marking:", err);
             }
@@ -131,6 +142,7 @@
         async function resetStudentPortal() {
             try {
                 await fetch('/api/stop_attendance', { method: 'POST' });
+                setUIState('idle', 'Resetting...', 'Preparing for next student.');
                 setTimeout(() => {
                     initStudentAttendance();
                 }, 300);
@@ -142,7 +154,6 @@
                 const res = await fetch('/api/status');
                 const data = await res.json();
 
-                const statusBadge = document.getElementById('statusBadge');
                 const profileName = document.getElementById('profileName');
                 const gazeDir = document.getElementById('gazeDir');
                 const progressText = document.getElementById('progressText');
@@ -153,14 +164,12 @@
 
                 if (data.state === "mark") {
                     if (data.recognized === "Unknown") {
-                        statusBadge.innerText = "Align Face in Frame";
-                        statusBadge.className = "badge badge-info";
+                        setUIState('idle', 'Align Face', 'Move closer into the frame.');
                         progressText.innerText = `0 / ${data.total_waypoints || 3}`;
                         progressBar.style.width = "0%";
+                        progressBar.style.background = "var(--primary)";
                     } else {
-                        statusBadge.innerText = "Follow the Moving Dot!";
-                        statusBadge.className = "badge badge-warning";
-                        
+                        setUIState('scanning', 'Liveness Check', 'Look at the moving dot on the screen.');
                         const wp = data.waypoint || 0;
                         const total = data.total_waypoints || 3;
                         progressText.innerText = `${wp} / ${total}`;
@@ -173,14 +182,12 @@
                         showToast(`Attendance marked successfully for ${data.recognized.replace(/_/g, ' ')}!`, 'success');
                         toastShown = true;
                     }
-                    statusBadge.innerText = "ATTENDANCE VERIFIED!";
-                    statusBadge.className = "badge badge-success";
+                    setUIState('success', 'Verified', 'Attendance marked successfully.');
                     const total = data.total_waypoints || 3;
                     progressText.innerText = `${total} / ${total}`;
                     progressBar.style.width = "100%";
                     progressBar.style.background = "var(--success)";
  
-                    // Auto-reset after 3.5 seconds for next student
                     setTimeout(() => {
                         if (toastShown) resetStudentPortal();
                     }, 3500);
@@ -189,13 +196,12 @@
                         showToast("Verification failed. Please look at the moving dot carefully.", "error");
                         audioPlayed = true;
                     }
-                    statusBadge.innerText = "VERIFICATION FAILED";
-                    statusBadge.className = "badge badge-danger";
+                    setUIState('error', 'Verification Failed', 'Face not clearly visible or challenge failed.');
                     progressText.innerText = `0 / ${data.total_waypoints || 3}`;
                     progressBar.style.width = "0%";
+                    progressBar.style.background = "var(--danger)";
                 } else {
-                    statusBadge.innerText = "Ready";
-                    statusBadge.className = "badge badge-info";
+                    setUIState('idle', 'Ready', 'Please step in front of the camera.');
                 }
             } catch(err) {
                 console.error("Error polling status:", err);

@@ -60,7 +60,6 @@ current_mode = "idle" # idle, register, mark
 registration_parser = None
 registration_student_id = None
 shared_status = {"message": "Idle", "student_name": "Unknown"}
-_last_detections = []  # Latest frame detections — read by DynamicZoom (display only)
 
 # ── Camera Threading ────────────────────────────────────────────────
 class CameraStream:
@@ -168,93 +167,6 @@ class InferenceWorker:
         return self.results.get(track_id)
 
 inference_worker = InferenceWorker()
-
-# ── Dynamic Digital Zoom (display-only, zero impact on AI pipeline) ──────────
-class DynamicZoom:
-    """
-    Applies smooth digital zoom to the MJPEG display frame.
-    - Single face far away → crop in on the face with padding.
-    - Multiple faces       → crop to the union bbox of all faces.
-    - Gaze dot active      → immediately fall back to full frame
-                             so the challenge dot is never clipped.
-    All zoom is applied AFTER process_frame() draws its overlays, so the AI
-    pipeline (detection, recognition, PAD, gaze) always runs on the full frame.
-    """
-    LERP = 0.08          # Smoothing factor per frame (~0.08 ≈ ~1s to settle)
-    ZOOM_AREA_THRESHOLD = 0.20  # Skip zoom when face(s) cover ≥20% of frame area
-    PADDING_RATIO = 0.75  # Pad each side by this fraction of the face dimension
-
-    def __init__(self):
-        self.roi = None  # (x1, y1, x2, y2) floats; None = uninitialized
-
-    def _compute_target(self, frame_h: int, frame_w: int,
-                        detections: list, gaze_active: bool) -> tuple:
-        full = (0.0, 0.0, float(frame_w), float(frame_h))
-        # Safety exit: no faces or gaze challenge running → full frame
-        if gaze_active or not detections:
-            return full
-
-        # Union bounding box across all detected faces
-        all_x1 = min(d.bbox[0] for d in detections)
-        all_y1 = min(d.bbox[1] for d in detections)
-        all_x2 = max(d.bbox[0] + d.bbox[2] for d in detections)
-        all_y2 = max(d.bbox[1] + d.bbox[3] for d in detections)
-        face_w  = all_x2 - all_x1
-        face_h  = all_y2 - all_y1
-
-        # Face(s) already large enough — no zoom needed
-        if (face_w * face_h) / (frame_w * frame_h) >= self.ZOOM_AREA_THRESHOLD:
-            return full
-
-        # Expand union bbox with padding
-        pad_x = face_w * self.PADDING_RATIO
-        pad_y = face_h * self.PADDING_RATIO
-        x1 = max(0.0, all_x1 - pad_x)
-        y1 = max(0.0, all_y1 - pad_y)
-        x2 = min(float(frame_w), all_x2 + pad_x)
-        y2 = min(float(frame_h), all_y2 + pad_y)
-
-        # Fix aspect ratio to match frame — prevents stretching
-        roi_w, roi_h = x2 - x1, y2 - y1
-        frame_ar = frame_w / frame_h
-        if roi_h > 0 and (roi_w / roi_h) > frame_ar:
-            new_h  = roi_w / frame_ar
-            extra  = (new_h - roi_h) / 2.0
-            y1     = max(0.0, y1 - extra)
-            y2     = min(float(frame_h), y1 + new_h)
-            y1     = max(0.0, y2 - new_h)
-        elif roi_w > 0:
-            new_w  = roi_h * frame_ar
-            extra  = (new_w - roi_w) / 2.0
-            x1     = max(0.0, x1 - extra)
-            x2     = min(float(frame_w), x1 + new_w)
-            x1     = max(0.0, x2 - new_w)
-
-        return (x1, y1, x2, y2)
-
-    def apply(self, frame: np.ndarray, detections: list, gaze_active: bool) -> np.ndarray:
-        """Lerps toward the target ROI and returns the cropped+upscaled frame."""
-        h, w = frame.shape[:2]
-        if self.roi is None:
-            self.roi = (0.0, 0.0, float(w), float(h))
-
-        target = self._compute_target(h, w, detections, gaze_active)
-
-        # Exponential lerp: faster when zooming out (gaze active), smooth otherwise
-        lerp = 0.20 if gaze_active else self.LERP
-        self.roi = tuple(self.roi[i] + (target[i] - self.roi[i]) * lerp for i in range(4))
-
-        x1, y1, x2, y2 = (int(round(v)) for v in self.roi)
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(w, x2), min(h, y2)
-        if x2 <= x1 or y2 <= y1:
-            return frame
-
-        crop = frame[y1:y2, x1:x2]
-        return cv2.resize(crop, (w, h), interpolation=cv2.INTER_LINEAR)
-
-
-dynamic_zoom = DynamicZoom()
 
 # ── Legacy-Proven GazeSession (ported from app_legacy.py) ───────────────
 DOT_RADIUS = 18
@@ -408,7 +320,7 @@ MULTI_SIM_THRESHOLD = 0.60  # minimum cosine similarity to accept as a match
 
 # ── Core Video Pipeline (Phase 2 & 14) ─────────────────────────────────
 def process_frame(frame):
-    global shared_status, current_mode, registration_parser, registration_student_id, _last_detections
+    global shared_status, current_mode, registration_parser, registration_student_id
     
     # Pipeline Timings
     t_start = time.time()
@@ -418,7 +330,6 @@ def process_frame(frame):
     t0 = time.time()
     detections = detector.detect(frame)
     timings['Detection'] = (time.time() - t0) * 1000
-    _last_detections = detections  # Cache for DynamicZoom (display only)
     
     # Format for ByteTrack
     track_dets = [(d.bbox, d.confidence) for d in detections]
@@ -782,11 +693,6 @@ def video_feed():
                         f.write(traceback.format_exc() + "\n")
                     # Return an error frame so the stream doesn't die immediately
                     cv2.putText(frame, "SYSTEM CRASHED", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
-                # ── Dynamic Zoom (display only) ─────────────────────────────
-                # Disable zoom when gaze dot is active so the dot is never clipped
-                _gaze_challenge_active = bool(_gaze_sessions)
-                frame = dynamic_zoom.apply(frame, _last_detections, _gaze_challenge_active)
                     
                 ret, jpeg = cv2.imencode('.jpg', frame)
                 if ret:
@@ -906,36 +812,6 @@ def delete_student():
     vector_engine.reload_gallery()
     
     return jsonify({"success": True, "message": f"Deleted student '{name}' successfully"})
-
-@app.route('/api/mark_absent', methods=['POST'])
-def mark_absent():
-    from datetime import datetime
-    data = request.json or {}
-    name = data.get("name", "").strip()
-    if not name:
-        return jsonify({"success": False, "message": "Student name is required"}), 400
-        
-    conn = db_manager.get_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT id FROM students WHERE name = ?", (name,))
-    row = cursor.fetchone()
-    if not row:
-        conn.close()
-        return jsonify({"success": False, "message": f"Student '{name}' not found"}), 404
-        
-    student_id = row['id']
-    today = datetime.now().strftime("%Y-%m-%d")
-    
-    cursor.execute("DELETE FROM attendance_records WHERE student_id = ? AND attendance_date = ?", (student_id, today))
-    changes = conn.total_changes
-    conn.commit()
-    conn.close()
-    
-    if changes > 0:
-        return jsonify({"success": True, "message": f"Marked '{name}' as absent"})
-    else:
-        return jsonify({"success": False, "message": f"'{name}' was not marked present today"})
 
 @app.route('/api/students', methods=['GET'])
 def get_students():

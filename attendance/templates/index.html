@@ -4,62 +4,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GazePass - Smart Attendance Portal</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=6">
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=8">
 </head>
 <body>
-
     <header>
         <div class="nav-container">
             <a href="/" class="logo">
-                <i class="fas fa-eye"></i> GAZEPASS
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                GAZEPASS
             </a>
             <div class="nav-links">
-                <a href="/admin" class="nav-btn">👑 Admin Portal</a>
-                <a href="/student" class="nav-btn">🎓 Student Portal</a>
+                <a href="/admin" class="nav-btn">Admin Portal</a>
+                <a href="/student" class="nav-btn">Student Portal</a>
             </div>
         </div>
     </header>
 
     <main style="max-width: 1000px; padding-top: 2rem;">
         <div class="animate-fade-up" style="text-align: center; margin-bottom: 3rem;">
-            <span class="badge badge-info" style="font-size: 0.9rem; padding: 0.4rem 1rem; margin-bottom: 1rem; display: inline-block;">
-                AI & Deep Learning Biometric System
+            <span class="badge badge-info" style="font-size: 0.9rem; margin-bottom: 1rem;">
+                Institutional Biometric System
             </span>
-            <h1 style="font-size: 2.8rem; line-height: 1.2; margin-bottom: 1rem;" class="title-glow">
+            <h1 style="font-size: 2.5rem; line-height: 1.2; margin-bottom: 1rem;">
                 Welcome to GazePass
             </h1>
-            <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 640px; margin: 0 auto;">
+            <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 640px; margin: 0 auto;">
                 Select your portal below to access administrator management tools or mark student attendance using liveness & gaze verification.
             </p>
         </div>
 
-        <div class="portal-grid animate-fade-up delay-1">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin-top: 2rem;" class="animate-fade-up delay-1">
             <!-- Admin Dashboard Card -->
-            <div class="portal-card">
-                <div class="portal-icon">👑</div>
+            <div class="card" style="display: flex; flex-direction: column; align-items: center; text-align: center;">
+                <div style="font-size: 3rem; margin-bottom: 1.2rem; width: 80px; height: 80px; border-radius: 50%; background: var(--bg-base); display: flex; align-items: center; justify-content: center; border: 1px solid var(--border);">
+                    <svg class="icon" style="width: 40px; height: 40px; color: var(--primary);" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                </div>
                 <h2 style="font-size: 1.5rem; margin-bottom: 0.8rem;">Admin Dashboard</h2>
                 <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.8rem; flex-grow: 1;">
                     Register new students, view registered student directory, track presents & absentees, inspect analytics, and export CSV logs.
                 </p>
-                <a href="/admin" class="btn btn-primary" style="width: 100%;">
-                    Access Admin Portal ➔
+                <a href="/admin" class="btn btn-secondary" style="width: 100%;">
+                    Access Admin Portal
                 </a>
             </div>
 
             <!-- Student Portal Card -->
-            <div class="portal-card student-card">
-                <div class="portal-icon">🎓</div>
+            <div class="card" style="display: flex; flex-direction: column; align-items: center; text-align: center; border-color: rgba(5, 150, 105, 0.3);">
+                <div style="font-size: 3rem; margin-bottom: 1.2rem; width: 80px; height: 80px; border-radius: 50%; background: var(--success-bg); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(5, 150, 105, 0.2);">
+                    <svg class="icon" style="width: 40px; height: 40px; color: var(--success);" viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+                </div>
                 <h2 style="font-size: 1.5rem; margin-bottom: 0.8rem;">Student Portal</h2>
                 <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.8rem; flex-grow: 1;">
                     Dedicated, distraction-free attendance marking interface with live webcam face recognition and gaze verification.
                 </p>
-                <a href="/student" class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #00ff87 0%, #60efff 100%);">
-                    Mark Attendance Now 🎯
+                <a href="/student" class="btn btn-primary" style="width: 100%; background: var(--success);">
+                    Mark Attendance Now
                 </a>
             </div>
         </div>
     </main>
-
 </body>
 </html>
